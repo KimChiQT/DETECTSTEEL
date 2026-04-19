@@ -48,6 +48,12 @@ export default function Header({ page, setPage, isLoggedIn, onLogout, onStart })
     else setPage('login')
   }
 
+  // Guard: chỉ cho phép navigate đến protected pages khi đã login
+  const goProtected = (target) => {
+    if (isLoggedIn) setPage(target)
+    else setPage('login')
+  }
+
   return (
     <header className="sticky top-0 z-50 w-full shrink-0 border-b border-slate-200/70 bg-white/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2 md:gap-4 md:px-6 md:py-2.5">
@@ -80,27 +86,33 @@ export default function Header({ page, setPage, isLoggedIn, onLogout, onStart })
             </button>
             <button
               type="button"
-              onClick={() => setPage('history')}
-              className={`${navBtn} ${page === 'history' ? navBtnActive : ''}`}
+              onClick={() => goProtected('history')}
+              className={`${navBtn} ${page === 'history' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}
+              title={!isLoggedIn ? 'Đăng nhập để sử dụng' : ''}
             >
               <IconFolder className="h-4 w-4 text-amber-600" />
               Lịch sử
+              {!isLoggedIn && <span className="ml-0.5 text-[9px]">🔒</span>}
             </button>
             <button
               type="button"
-              onClick={() => setPage('batch')}
-              className={`${navBtn} ${page === 'batch' ? navBtnActive : ''}`}
+              onClick={() => goProtected('batch')}
+              className={`${navBtn} ${page === 'batch' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}
+              title={!isLoggedIn ? 'Đăng nhập để sử dụng' : ''}
             >
               <IconLayers className="h-4 w-4 text-violet-600" />
               Phân tích Lô
+              {!isLoggedIn && <span className="ml-0.5 text-[9px]">🔒</span>}
             </button>
             <button
               type="button"
-              onClick={() => setPage('stats')}
-              className={`${navBtn} ${page === 'stats' ? navBtnActive : ''}`}
+              onClick={() => goProtected('stats')}
+              className={`${navBtn} ${page === 'stats' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}
+              title={!isLoggedIn ? 'Đăng nhập để sử dụng' : ''}
             >
               <IconChart className="h-4 w-4 text-emerald-600" />
               Thống kê
+              {!isLoggedIn && <span className="ml-0.5 text-[9px]">🔒</span>}
             </button>
           </div>
         </nav>
@@ -152,14 +164,14 @@ export default function Header({ page, setPage, isLoggedIn, onLogout, onStart })
                 onClick={goDashboard}
                 className="hidden rounded-lg bg-[#1E3A8A] px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-white shadow-md transition hover:bg-[#172554] hover:shadow-lg md:inline-flex md:rounded-xl md:px-5 md:py-2.5 md:text-xs"
               >
-                BẮT ĐẦU NGAY
+                ĐĂNG NHẬP
               </button>
               <button
                 type="button"
                 onClick={goDashboard}
                 className="inline-flex rounded-lg bg-[#1E3A8A] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-white shadow-md md:hidden"
               >
-                BẮT ĐẦU
+                ĐĂNG NHẬP
               </button>
             </>
           )}
@@ -171,14 +183,14 @@ export default function Header({ page, setPage, isLoggedIn, onLogout, onStart })
           <button type="button" onClick={() => setPage('home')} className={`${navBtn} text-xs ${page === 'home' ? navBtnActive : ''}`}>
             <IconHome className="h-3.5 w-3.5" /> Trang chủ
           </button>
-          <button type="button" onClick={() => setPage('history')} className={`${navBtn} text-xs ${page === 'history' ? navBtnActive : ''}`}>
-            <IconFolder className="h-3.5 w-3.5" /> Lịch sử
+          <button type="button" onClick={() => goProtected('history')} className={`${navBtn} text-xs ${page === 'history' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}>
+            <IconFolder className="h-3.5 w-3.5" /> Lịch sử {!isLoggedIn && '🔒'}
           </button>
-          <button type="button" onClick={() => setPage('batch')} className={`${navBtn} text-xs ${page === 'batch' ? navBtnActive : ''}`}>
-            <IconLayers className="h-3.5 w-3.5" /> Phân tích Lô
+          <button type="button" onClick={() => goProtected('batch')} className={`${navBtn} text-xs ${page === 'batch' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}>
+            <IconLayers className="h-3.5 w-3.5" /> Phân tích Lô {!isLoggedIn && '🔒'}
           </button>
-          <button type="button" onClick={() => setPage('stats')} className={`${navBtn} text-xs ${page === 'stats' ? navBtnActive : ''}`}>
-            <IconChart className="h-3.5 w-3.5" /> Thống kê
+          <button type="button" onClick={() => goProtected('stats')} className={`${navBtn} text-xs ${page === 'stats' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}>
+            <IconChart className="h-3.5 w-3.5" /> Thống kê {!isLoggedIn && '🔒'}
           </button>
         </div>
       </div>

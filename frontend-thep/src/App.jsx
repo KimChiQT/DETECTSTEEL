@@ -11,38 +11,82 @@ import Footer from './components/Footer'
 import Login from './components/Login'
 import BatchAnalysis from './components/BatchAnalysis'
 
+const PROTECTED_PAGES = ['batch', 'dashboard', 'history', 'stats']
+
+/* Modal yêu cầu đăng nhập */
+function LoginRequiredModal({ onLogin, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-2xl">
+          🔒
+        </div>
+        <h3 className="text-base font-bold text-slate-900">Yêu cầu đăng nhập</h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Bạn cần đăng nhập để sử dụng tính năng này.
+        </p>
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onLogin}
+            className="flex-1 rounded-xl bg-[#1E3A8A] py-2.5 text-sm font-bold text-white transition hover:bg-[#172554]"
+          >
+            Đăng nhập ngay
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Huỷ
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App(){
   const [page, setPage] = useState('home')
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
-  // ── Auth state ──────────────────────────────────────────
-  // Check localStorage on first render so refresh keeps user logged in
   const [isLoggedIn, setIsLoggedIn] = useState(
     () => localStorage.getItem('ds_logged_in') === '1'
   )
 
-  // "Bắt đầu ngay" → go to batch analysis if already logged in, else login
-  const handleDemoAnalyze = async () => {
-    if (isLoggedIn) {
-      setPage('batch')
-    } else {
-      setPage('login')
+  // Intercept setPage — chặn protected pages khi chưa login
+  const navigate = (target) => {
+    if (PROTECTED_PAGES.includes(target) && !isLoggedIn) {
+      setShowLoginModal(true)
+      return
     }
+    setShowLoginModal(false)
+    setPage(target)
   }
 
-  // Called after successful login → go to batch analysis
+  const handleDemoAnalyze = () => navigate('batch')
+
   const handleLoginSuccess = () => {
     setIsLoggedIn(true)
     localStorage.setItem('ds_logged_in', '1')
+    setShowLoginModal(false)
     setPage('batch')
   }
 
-  // Logout
   const handleLogout = () => {
     setIsLoggedIn(false)
     localStorage.removeItem('ds_logged_in')
     localStorage.removeItem('ds_remember')
     setPage('home')
   }
+
+  // Safety net: nếu page bị set thành protected khi chưa login → redirect
+  useEffect(() => {
+    if (PROTECTED_PAGES.includes(page) && !isLoggedIn) {
+      setPage('home')
+    }
+  }, [page, isLoggedIn])
 
   useEffect(()=>{
     if(page === 'dashboard'){
@@ -72,13 +116,29 @@ function App(){
   },[page])
 
   return (
-    <div className={page === 'home' ? 'min-h-screen bg-white' : 'min-h-screen bg-white'}>
-      {/* Login page has its own full-screen layout — no header */}
+    <div className="min-h-screen bg-white">
+      {/* Login modal khi chưa đăng nhập */}
+      {showLoginModal && (
+        <LoginRequiredModal
+          onLogin={() => { setShowLoginModal(false); setPage('login') }}
+          onClose={() => setShowLoginModal(false)}
+        />
+      )}
+
+      {/* Login page — full screen, không có header */}
       {page === 'login' && (
         <Login onLoginSuccess={handleLoginSuccess} />
       )}
 
-      {page !== 'login' && <Header page={page} setPage={setPage} isLoggedIn={isLoggedIn} onLogout={handleLogout} onStart={handleDemoAnalyze} />}
+      {page !== 'login' && (
+        <Header
+          page={page}
+          setPage={navigate}
+          isLoggedIn={isLoggedIn}
+          onLogout={handleLogout}
+          onStart={handleDemoAnalyze}
+        />
+      )}
 
       {page === 'home' && (
         <main className="flex flex-col">
@@ -89,21 +149,22 @@ function App(){
         </main>
       )}
 
-      {page === 'batch' && (
-        <BatchAnalysis onGoAHP={() => setPage('dashboard')} />
+      {page === 'batch' && isLoggedIn && (
+        <BatchAnalysis onGoAHP={() => navigate('dashboard')} />
       )}
 
-      {page === 'dashboard' && (
+      {page === 'dashboard' && isLoggedIn && (
         <div id="dashboard-root">
           <Dashboard />
         </div>
       )}
 
-      {page === 'history' && (
+      {page === 'history' && isLoggedIn && (
         <History />
       )}
-      {page === 'stats' && (
-        <Stats onReanalyze={() => setPage('batch')} />
+
+      {page === 'stats' && isLoggedIn && (
+        <Stats onReanalyze={() => navigate('batch')} />
       )}
     </div>
   )
