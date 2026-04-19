@@ -137,6 +137,15 @@ function TrendCard({ trendData }) {
   )
 }
 
+/* ── Bỏ dấu tiếng Việt để dùng với font helvetica của jsPDF ── */
+function removeDiacritics(str) {
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+}
+const pdfText = (pdf, text, ...args) => pdf.text(removeDiacritics(text), ...args)
+
 /* ── PDF generator — vẽ trực tiếp bằng jsPDF, không dùng html2canvas ── */
 async function generateAndDownloadPDF(it) {
   const fmtVND = (n) => Number(n || 0).toLocaleString('vi-VN')
@@ -148,12 +157,12 @@ async function generateAndDownloadPDF(it) {
   let y = margin
 
   // ── Header bar ──────────────────────────────────────────
-  pdf.setFillColor(30, 58, 138)          // #1E3A8A
+  pdf.setFillColor(30, 58, 138)
   pdf.rect(margin, y, W - margin * 2, 36, 'F')
   pdf.setTextColor(255, 255, 255)
   pdf.setFontSize(14)
   pdf.setFont('helvetica', 'bold')
-  pdf.text('DetectSteel — Bao cao Phan tich', margin + 10, y + 24)
+  pdfText(pdf, 'DetectSteel — Báo cáo Phân tích', margin + 10, y + 24)
   y += 50
 
   // ── Meta info ───────────────────────────────────────────
@@ -161,9 +170,9 @@ async function generateAndDownloadPDF(it) {
   pdf.setFontSize(9)
   pdf.setFont('helvetica', 'normal')
   const dateStr = new Date(it.ts).toLocaleString('vi-VN')
-  const lotStr = it.imageId || `Lo #${it.lotCode || it.id}`
-  pdf.text(`Thoi gian: ${dateStr}`, margin, y)
-  pdf.text(`Lo: ${lotStr}`, margin + 260, y)
+  const lotStr = it.imageId || `Lô #${it.lotCode || it.id}`
+  pdfText(pdf, `Thời gian: ${dateStr}`, margin, y)
+  pdfText(pdf, `Lô: ${lotStr}`, margin + 260, y)
   y += 18
 
   // ── Divider ─────────────────────────────────────────────
@@ -177,7 +186,6 @@ async function generateAndDownloadPDF(it) {
     try {
       const imgW = W - margin * 2
       const imgH = 200
-      // imageData is already a data URL (data:image/jpeg;base64,...)
       const format = it.imageData.startsWith('data:image/png') ? 'PNG' : 'JPEG'
       pdf.addImage(it.imageData, format, margin, y, imgW, imgH)
       y += imgH + 14
@@ -195,9 +203,9 @@ async function generateAndDownloadPDF(it) {
   pdf.setTextColor(71, 85, 105)
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'bold')
-  pdf.text('Loai loi', margin + 6, y + 13)
-  pdf.text('Do tin cay', margin + 240, y + 13)
-  pdf.text('Chi phi (VND)', W - margin - 6, y + 13, { align: 'right' })
+  pdfText(pdf, 'Loại lỗi', margin + 6, y + 13)
+  pdfText(pdf, 'Độ tin cậy', margin + 240, y + 13)
+  pdfText(pdf, 'Chi phí (VND)', W - margin - 6, y + 13, { align: 'right' })
   y += 20
 
   // ── Defect rows ─────────────────────────────────────────
@@ -207,7 +215,7 @@ async function generateAndDownloadPDF(it) {
 
   if (defects.length === 0) {
     pdf.setTextColor(148, 163, 184)
-    pdf.text('Khong phat hien loi.', margin + 6, y + 13)
+    pdfText(pdf, 'Không phát hiện lỗi.', margin + 6, y + 13)
     y += 22
   } else {
     defects.forEach((d, i) => {
@@ -218,7 +226,7 @@ async function generateAndDownloadPDF(it) {
       pdf.line(margin, y + 20, W - margin, y + 20)
 
       pdf.setTextColor(51, 65, 85)
-      pdf.text(String(d.label || d.name || '-'), margin + 6, y + 13)
+      pdfText(pdf, String(d.label || d.name || '-'), margin + 6, y + 13)
       pdf.text(fmtPct(d.confidence), margin + 240, y + 13)
       pdf.text(fmtVND(d.cost), W - margin - 6, y + 13, { align: 'right' })
       y += 20
@@ -232,7 +240,7 @@ async function generateAndDownloadPDF(it) {
     pdf.rect(margin, y, W - margin * 2, 20, 'F')
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(15, 23, 42)
-    pdf.text('Tong chi phi:', margin + 6, y + 13)
+    pdfText(pdf, 'Tổng chi phí:', margin + 6, y + 13)
     pdf.text(fmtVND(totalCost) + ' VND', W - margin - 6, y + 13, { align: 'right' })
     y += 26
   }
@@ -244,7 +252,7 @@ async function generateAndDownloadPDF(it) {
 
   // ── AHP result box ──────────────────────────────────────
   const isRepair = it.decision === 'repair'
-  const boxColor = isRepair ? [5, 150, 105] : [220, 38, 38]   // emerald / red
+  const boxColor = isRepair ? [5, 150, 105] : [220, 38, 38]
   pdf.setFillColor(248, 250, 252)
   pdf.roundedRect(margin, y, W - margin * 2, 56, 4, 4, 'F')
   pdf.setDrawColor(226, 232, 240)
@@ -253,18 +261,18 @@ async function generateAndDownloadPDF(it) {
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'bold')
   pdf.setTextColor(100, 116, 139)
-  pdf.text('KET QUA AHP', margin + 10, y + 14)
+  pdfText(pdf, 'KẾT QUẢ AHP', margin + 10, y + 14)
 
   pdf.setFontSize(13)
   pdf.setFont('helvetica', 'bold')
   pdf.setTextColor(...boxColor)
-  pdf.text(isRepair ? 'NEN SUA CHUA' : 'NEN LOAI BO', margin + 10, y + 32)
+  pdfText(pdf, isRepair ? 'NÊN SỬA CHỮA' : 'NÊN LOẠI BỎ', margin + 10, y + 32)
 
   pdf.setFontSize(9)
   pdf.setFont('helvetica', 'normal')
   pdf.setTextColor(100, 116, 139)
-  pdf.text(
-    `Score Sua: ${Number(it.repairScore || 0).toFixed(3)}   Score Bo: ${Number(it.replaceScore || 0).toFixed(3)}`,
+  pdfText(pdf,
+    `Score Sửa: ${Number(it.repairScore || 0).toFixed(3)}   Score Bỏ: ${Number(it.replaceScore || 0).toFixed(3)}`,
     margin + 10,
     y + 46
   )
@@ -274,8 +282,8 @@ async function generateAndDownloadPDF(it) {
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'normal')
   pdf.setTextColor(148, 163, 184)
-  pdf.text(
-    'He thong DetectSteel AI © 2023 — Phat trien boi Doi ngu R&D',
+  pdfText(pdf,
+    'Hệ thống DetectSteel AI © 2025 — Phát triển bởi Đội ngũ R&D',
     W / 2,
     pdf.internal.pageSize.getHeight() - 20,
     { align: 'center' }
