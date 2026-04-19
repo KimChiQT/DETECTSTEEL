@@ -73,7 +73,7 @@ function App(){
   },[page])
 
   return (
-    <div className={page === 'home' ? 'flex h-dvh flex-col overflow-hidden bg-white' : 'min-h-screen bg-white'}>
+    <div className={page === 'home' ? 'min-h-screen bg-white' : 'min-h-screen bg-white'}>
       {/* Login page has its own full-screen layout — no header */}
       {page === 'login' && (
         <Login onLoginSuccess={handleLoginSuccess} />
@@ -82,7 +82,7 @@ function App(){
       {page !== 'login' && <Header page={page} setPage={setPage} isLoggedIn={isLoggedIn} onLogout={handleLogout} onStart={handleDemoAnalyze} />}
 
       {page === 'home' && (
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <main className="flex flex-col">
           <Hero onDemo={handleDemoAnalyze} />
           <Features />
           <HowItWorks />

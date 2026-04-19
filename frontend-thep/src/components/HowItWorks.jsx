@@ -1,37 +1,72 @@
 import React from 'react'
 
 const steps = [
-  { icon: '📷', title: 'Tải lên Lô Ảnh Thép', desc: 'Tải lên lô ảnh thép, hỗ trợ nhiều ảnh cùng lúc.' },
-  { icon: '🤖', title: 'AI Phân Tích Lỗi', desc: 'AI phát hiện và phân loại lỗi bề mặt thép tự động.' },
-  { icon: '💡', title: 'Nhận Lời Khuyên AHP', desc: 'Đưa ra gợi ý Sửa chữa hay Loại bỏ dựa trên đa tiêu chí.' },
-  { icon: '📄', title: 'Tạo và Tải Báo Cáo', desc: 'Tạo và xuất kết quả chi tiết dạng PDF chuyên nghiệp.' },
+  {
+    icon: '📷',
+    step: '01',
+    title: 'Tải lên Lô Ảnh Thép',
+    desc: 'Tải lên một hoặc nhiều ảnh thép cùng lúc. Hỗ trợ JPG, PNG với kích thước linh hoạt.',
+  },
+  {
+    icon: '🤖',
+    step: '02',
+    title: 'AI Phân Tích Lỗi',
+    desc: 'Mô hình YOLOv8 tự động phát hiện và phân loại 6 loại khuyết tật bề mặt thép.',
+  },
+  {
+    icon: '💡',
+    step: '03',
+    title: 'Nhận Lời Khuyên AHP',
+    desc: 'Hệ thống AHP đưa ra gợi ý Sửa chữa hay Loại bỏ dựa trên đa tiêu chí có trọng số.',
+  },
+  {
+    icon: '📄',
+    step: '04',
+    title: 'Tạo và Tải Báo Cáo',
+    desc: 'Xuất kết quả phân tích đầy đủ dạng PDF chuyên nghiệp chỉ với một cú nhấp.',
+  },
 ]
 
 export default function HowItWorks() {
   return (
-    <section className="shrink-0 bg-slate-50 px-4 py-4 md:px-6">
-      <h2 className="mb-3 text-center text-sm font-extrabold text-slate-900 md:text-base">
-        How It Works
-      </h2>
-      <div className="mx-auto flex max-w-5xl items-start justify-center gap-1 md:gap-0">
-        {steps.map((s, i) => (
-          <React.Fragment key={i}>
-            <div className="flex w-[22%] flex-col items-center text-center md:flex-1">
-              <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-white text-2xl shadow-sm ring-1 ring-slate-200 md:h-12 md:w-12">
+    <section className="bg-slate-50 px-6 py-20 md:px-10 lg:px-16">
+      {/* Section header */}
+      <div className="mx-auto mb-12 max-w-2xl text-center">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-slate-200 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-slate-600">
+          Quy trình
+        </div>
+        <h2 className="text-3xl font-black text-slate-900 md:text-4xl">
+          Cách hoạt động
+        </h2>
+        <p className="mt-4 text-base leading-relaxed text-slate-500">
+          Chỉ 4 bước đơn giản để có kết quả kiểm định chuyên nghiệp.
+        </p>
+      </div>
+
+      {/* Steps */}
+      <div className="mx-auto max-w-5xl">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+          {steps.map((s, i) => (
+            <div key={i} className="relative flex flex-col items-center text-center">
+              {/* Connector line (desktop) */}
+              {i < steps.length - 1 && (
+                <div className="absolute left-[calc(50%+2.5rem)] top-8 hidden h-0.5 w-[calc(100%-5rem)] bg-slate-200 lg:block" aria-hidden />
+              )}
+
+              {/* Icon circle */}
+              <div className="relative mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-3xl shadow-md ring-1 ring-slate-200">
                 {s.icon}
+                {/* Step number badge */}
+                <span className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#1E3A8A] text-[10px] font-black text-white shadow">
+                  {s.step}
+                </span>
               </div>
-              <p className="text-[10px] font-bold leading-snug text-slate-800 md:text-xs">{s.title}</p>
-              <p className="mt-0.5 hidden text-[9px] leading-snug text-slate-500 md:block md:text-[10px]">{s.desc}</p>
+
+              <h3 className="text-sm font-bold leading-snug text-slate-900 md:text-base">{s.title}</h3>
+              <p className="mt-2 text-xs leading-relaxed text-slate-500 md:text-sm">{s.desc}</p>
             </div>
-            {i < steps.length - 1 && (
-              <div className="shrink-0 self-start pt-5 text-slate-300 md:px-1">
-                <svg className="h-4 w-6 md:h-5 md:w-8" viewBox="0 0 40 24" fill="none">
-                  <path d="M4 12h28M28 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            )}
-          </React.Fragment>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   )
