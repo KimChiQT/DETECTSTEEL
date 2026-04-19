@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40" viewBox="0 0 160 40">
+  <rect width="160" height="40" rx="8" fill="#1E3A8A" />
+  <g transform="translate(8,6)">
+    <circle cx="12" cy="12" r="10" fill="#06b6d4" />
+    <text x="36" y="18" font-size="14" fill="#fff" font-family="Inter, Arial" font-weight="700">DetectSteel</text>
+  </g>
+</svg>
