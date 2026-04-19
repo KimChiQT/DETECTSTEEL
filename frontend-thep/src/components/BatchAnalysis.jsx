@@ -225,10 +225,10 @@ export default function BatchAnalysis({ onGoAHP }) {
     const mapped = arr.map(fileToObj)
     setImages((prev) => {
       const next = [...prev, ...mapped]
-      if (!selectedId) setSelectedId(mapped[0].id)
       return next
     })
-  }, [selectedId])
+    setSelectedId((cur) => cur ?? mapped[0].id)
+  }, [])
 
   const onDrop = (e) => { e.preventDefault(); addFiles(e.dataTransfer.files) }
   const onFileInput = (e) => addFiles(e.target.files)

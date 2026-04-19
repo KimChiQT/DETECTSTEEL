@@ -43,7 +43,7 @@ export default function AHPPanel({
   costWeight, timeWeight, areaWeight,
   setCostWeight, setTimeWeight, setAreaWeight,
   onCompute, computing,
-  onAnalyze, loading, canAnalyze,
+  onAnalyze, loading, canAnalyze, canAHP,
 }) {
   return (
     <div>
@@ -78,7 +78,8 @@ export default function AHPPanel({
         {/* AHP compute button – primary style */}
         <button
           onClick={onCompute}
-          disabled={computing}
+          disabled={computing || !canAHP}
+          title={!canAHP ? 'Hãy phân tích ảnh trước' : ''}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E3A8A] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white shadow-md transition hover:bg-[#172554] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {computing ? (

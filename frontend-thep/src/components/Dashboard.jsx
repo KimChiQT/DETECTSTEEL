@@ -260,7 +260,9 @@ export default function Dashboard() {
       // Update image with annotated base64 from API
       setImages((prev) =>
         prev.map((img) =>
-          img.id === selectedImage.id ? { ...img, image_base64: data.image_base64 } : img
+          img.id === selectedImage.id
+            ? { ...img, image_base64: data.image_base64, url: data.image_base64 }
+            : img
         )
       )
 
@@ -396,6 +398,7 @@ export default function Dashboard() {
                 onAnalyze={handleAnalyze}
                 loading={loading}
                 canAnalyze={Boolean(selectedImage)}
+                canAHP={Boolean(lastEntryId)}
               />
             </div>
 

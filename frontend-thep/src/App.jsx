@@ -12,7 +12,6 @@ import Login from './components/Login'
 import BatchAnalysis from './components/BatchAnalysis'
 
 function App(){
-  const [reportData, setReportData] = useState(null)
   const [page, setPage] = useState('home')
 
   // ── Auth state ──────────────────────────────────────────
@@ -96,7 +95,7 @@ function App(){
 
       {page === 'dashboard' && (
         <div id="dashboard-root">
-          <Dashboard reportData={reportData} onAnalyze={handleDemoAnalyze} />
+          <Dashboard />
         </div>
       )}
 
