@@ -147,6 +147,126 @@ function removeDiacritics(str) {
 const pdfText = (pdf, text, ...args) => pdf.text(removeDiacritics(text), ...args)
 
 /* ── PDF generator — vẽ trực tiếp bằng jsPDF, không dùng html2canvas ── */
+async function generateStatsPDF(items, year, months, selectedDay) {
+  const fmtVND = (n) => Number(n || 0).toLocaleString('vi-VN')
+  const fmtPct = (n) => ((Number(n) || 0) * 100).toFixed(1) + '%'
+
+  const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+  const W = pdf.internal.pageSize.getWidth()   // 595
+  const margin = 40
+  let y = margin
+
+  // ── Header bar ──────────────────────────────────────────
+  pdf.setFillColor(30, 58, 138)
+  pdf.rect(margin, y, W - margin * 2, 36, 'F')
+  pdf.setTextColor(255, 255, 255)
+  pdf.setFontSize(14)
+  pdf.setFont('helvetica', 'bold')
+  pdfText(pdf, 'DetectSteel — Báo Cáo Tổng Hợp Nhật Ký Phân Tích', margin + 10, y + 24)
+  y += 50
+
+  // ── Meta info ───────────────────────────────────────────
+  pdf.setTextColor(100, 116, 139)
+  pdf.setFontSize(9)
+  pdf.setFont('helvetica', 'normal')
+  const monthStr = months.length === MONTH_OPTIONS.length ? 'Tất cả' : months.map(m => `Tháng ${m}`).join(', ')
+  const dayStr = selectedDay ? `Ngày ${selectedDay}` : 'Tất cả ngày'
+  pdfText(pdf, `Năm: ${year}`, margin, y)
+  pdfText(pdf, `Tháng: ${monthStr}`, margin + 200, y)
+  pdfText(pdf, `Ngày: ${dayStr}`, margin + 400, y)
+  y += 18
+  pdfText(pdf, `Tổng số lô: ${items.length}`, margin, y)
+  y += 18
+
+  // ── Divider ─────────────────────────────────────────────
+  pdf.setDrawColor(226, 232, 240)
+  pdf.setLineWidth(0.5)
+  pdf.line(margin, y, W - margin, y)
+  y += 14
+
+  // ── Summary stats ───────────────────────────────────────
+  pdf.setFontSize(11)
+  pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor(15, 23, 42)
+  pdfText(pdf, 'Tóm Tắt Thống Kê', margin, y)
+  y += 20
+
+  const totalFaults = items.reduce((s, it) => s + it.totalFault, 0)
+  const totalCost = items.reduce((s, it) => s + it.defects.reduce((c, d) => c + (Number(d.cost) || 0), 0), 0)
+  const repairCount = items.filter(it => it.decision === 'repair').length
+  const replaceCount = items.filter(it => it.decision === 'replace').length
+
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(9)
+  pdf.setTextColor(51, 65, 85)
+  pdfText(pdf, `Tổng số lỗi phát hiện: ${totalFaults}`, margin, y)
+  y += 14
+  pdfText(pdf, `Tổng chi phí ước tính: ${fmtVND(totalCost)} VND`, margin, y)
+  y += 14
+  pdfText(pdf, `Số lô khuyên sửa chữa: ${repairCount}`, margin, y)
+  y += 14
+  pdfText(pdf, `Số lô khuyên loại bỏ: ${replaceCount}`, margin, y)
+  y += 24
+
+  // ── Table header ────────────────────────────────────────
+  pdf.setFillColor(248, 250, 252)
+  pdf.rect(margin, y, W - margin * 2, 20, 'F')
+  pdf.setDrawColor(226, 232, 240)
+  pdf.rect(margin, y, W - margin * 2, 20, 'S')
+
+  pdf.setTextColor(71, 85, 105)
+  pdf.setFontSize(8)
+  pdf.setFont('helvetica', 'bold')
+  pdfText(pdf, 'ID Lô', margin + 6, y + 13)
+  pdfText(pdf, 'Thời gian', margin + 80, y + 13)
+  pdfText(pdf, 'Tổng lỗi', margin + 200, y + 13)
+  pdfText(pdf, 'Lỗi lớn/nhỏ', margin + 280, y + 13)
+  pdfText(pdf, 'Loại lỗi chính', margin + 360, y + 13)
+  pdfText(pdf, 'Quyết định AHP', margin + 460, y + 13)
+  y += 20
+
+  // ── Table rows ──────────────────────────────────────────
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(8)
+
+  items.forEach((it, idx) => {
+    const rowBg = idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252]
+    pdf.setFillColor(...rowBg)
+    pdf.rect(margin, y, W - margin * 2, 18, 'F')
+    pdf.setDrawColor(241, 245, 249)
+    pdf.line(margin, y + 18, W - margin, y + 18)
+
+    pdf.setTextColor(51, 65, 85)
+    pdfText(pdf, `#${it.lotCode}`, margin + 6, y + 12)
+    pdfText(pdf, new Date(it.ts).toLocaleString('vi-VN'), margin + 80, y + 12)
+    pdfText(pdf, String(it.totalFault), margin + 200, y + 12)
+    pdfText(pdf, `${it.majorCount}/${it.minorCount}`, margin + 280, y + 12)
+    pdfText(pdf, String(it.topDefect), margin + 360, y + 12)
+    const decision = it.decision === 'repair' ? 'Sửa chữa' : 'Loại bỏ'
+    pdfText(pdf, decision, margin + 460, y + 12)
+    y += 18
+
+    // Check for page break
+    if (y > pdf.internal.pageSize.getHeight() - 60) {
+      pdf.addPage()
+      y = margin
+    }
+  })
+
+  // ── Footer ──────────────────────────────────────────────
+  pdf.setFontSize(8)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setTextColor(148, 163, 184)
+  pdfText(pdf,
+    'Hệ thống DetectSteel AI © 2025 — Phát triển bởi Đội ngũ R&D',
+    W / 2,
+    pdf.internal.pageSize.getHeight() - 20,
+    { align: 'center' }
+  )
+
+  pdf.save(`detectsteel-stats-${year}-${months.join('-')}${selectedDay ? `-day${selectedDay}` : ''}.pdf`)
+}
+
 async function generateAndDownloadPDF(it) {
   const fmtVND = (n) => Number(n || 0).toLocaleString('vi-VN')
   const fmtPct = (n) => ((Number(n) || 0) * 100).toFixed(1) + '%'
@@ -315,9 +435,9 @@ function DetailModal({ item, onClose, onDownloadPDF, downloading }) {
               className="flex items-center gap-1.5 rounded-lg bg-[#1E3A8A] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#172554] disabled:opacity-60"
             >
               {downloading ? (
-                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
               ) : (
-                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
               )}
               Tải PDF
             </button>
@@ -444,9 +564,9 @@ function LogTable({ rows, onViewPDF, onReanalyze, downloadingId }) {
                         className="flex items-center gap-1 rounded-md bg-[#1E3A8A] px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-[#172554] disabled:opacity-60"
                       >
                         {isDownloading ? (
-                          <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                          <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
                         ) : (
-                          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                          <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                         )}
                         Xem chi tiết PDF
                       </button>
@@ -455,7 +575,7 @@ function LogTable({ rows, onViewPDF, onReanalyze, downloadingId }) {
                         onClick={() => onReanalyze(it)}
                         className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 hover:border-[#1E3A8A] hover:text-[#1E3A8A]"
                       >
-                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-4.5" /></svg>
                         Phân tích lại
                       </button>
                     </div>
@@ -521,6 +641,8 @@ function HowItWorksStrip() {
 export default function Stats({ onReanalyze }) {
   const [items, setItems] = useState([])
   const [months, setMonths] = useState(MONTH_OPTIONS)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedDay, setSelectedDay] = useState(null) // null means all days
   const [modalItem, setModalItem] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -560,8 +682,14 @@ export default function Stats({ onReanalyze }) {
 
   const filtered = useMemo(() => {
     if (items.length === 0) return []
-    return items.filter((it) => months.includes(new Date(it.ts).getMonth() + 1))
-  }, [items, months])
+    return items.filter((it) => {
+      const date = new Date(it.ts)
+      const matchesMonth = months.includes(date.getMonth() + 1)
+      const matchesYear = date.getFullYear() === selectedYear
+      const matchesDay = selectedDay === null || date.getDate() === selectedDay
+      return matchesMonth && matchesYear && matchesDay
+    })
+  }, [items, months, selectedYear, selectedDay])
 
   const kpis = useMemo(() => {
     const analyzedLots = filtered.length
@@ -672,65 +800,124 @@ export default function Stats({ onReanalyze }) {
     if (onReanalyze) onReanalyze(it)
   }
 
+  /* ── Tải báo cáo tổng hợp ── */
+  const handleDownloadStatsPDF = async () => {
+    if (filtered.length === 0) return
+    setDownloadingId('stats')
+    try {
+      await generateStatsPDF(filtered, selectedYear, months, selectedDay)
+    } catch (e) {
+      console.error('Stats PDF error:', e)
+      alert('Không thể tạo báo cáo tổng hợp: ' + e.message)
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
   return (
     <>
-    <section id="stats-root" className="min-h-screen bg-[#F6F8FC] px-4 py-6 lg:px-6">
-      <div className="mx-auto max-w-[1400px] space-y-4">
+      <section id="stats-root" className="min-h-screen bg-[#F6F8FC] px-4 py-6 lg:px-6">
+        <div className="mx-auto max-w-[1400px] space-y-4">
 
-        {/* Page title */}
-        <h2 className="text-xl font-extrabold text-slate-900">
-          Hồ sơ Lịch sử và Đồ thị Phân tích (Analytics &amp; History)
-        </h2>
+          {/* Page title */}
+          <h2 className="text-xl font-extrabold text-slate-900">
+            Hồ sơ Lịch sử và Đồ thị Phân tích (Analytics &amp; History)
+          </h2>
 
-        {/* Date range filter */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-xs font-semibold text-slate-500">Date range:</span>
-          {MONTH_OPTIONS.map((m) => (
-            <button
-              key={m}
-              onClick={() => toggleMonth(m)}
-              className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
-                months.includes(m)
-                  ? 'bg-[#1E3A8A] text-white shadow-sm'
-                  : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
+          {/* Date range filter */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-xs font-semibold text-slate-500">Date range:</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
             >
-              Tháng {m}
+              {[2023, 2024, 2025, 2026].map((year) => (
+                <option key={year} value={year}>
+                  Năm {year}
+                </option>
+              ))}
+            </select>
+            <select
+              value={selectedDay || ''}
+              onChange={(e) => setSelectedDay(e.target.value ? Number(e.target.value) : null)}
+              className="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+            >
+              <option value="">Tất cả ngày</option>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                <option key={day} value={day}>
+                  Ngày {day}
+                </option>
+              ))}
+            </select>
+            {MONTH_OPTIONS.map((m) => (
+              <button
+                key={m}
+                onClick={() => toggleMonth(m)}
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition ${months.includes(m)
+                    ? 'bg-[#1E3A8A] text-white shadow-sm'
+                    : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}
+              >
+                Tháng {m}
+              </button>
+            ))}
+          </div>
+
+          {/* Row 1: KPI + Donut | Trend chart */}
+          <div className="grid grid-cols-12 gap-4">
+            {/* Left column */}
+            <div className="col-span-12 space-y-4 lg:col-span-4">
+              <KpiCard kpis={kpis} />
+              <DonutCard pieData={pieData} />
+            </div>
+
+            {/* Right column – trend */}
+            <div className="col-span-12 lg:col-span-8">
+              <TrendCard trendData={trendData} />
+            </div>
+          </div>
+
+          {/* Row 2: Log table */}
+          <LogTable
+            rows={filtered}
+            onViewPDF={handleViewPDF}
+            onReanalyze={handleReanalyze}
+            downloadingId={downloadingId}
+          />
+
+          {/* Row 3: Download summary report */}
+          <div className="flex justify-center">
+            <button
+              onClick={handleDownloadStatsPDF}
+              disabled={filtered.length === 0 || downloadingId === 'stats'}
+              className="flex items-center gap-2 rounded-lg bg-[#1E3A8A] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#172554] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {downloadingId === 'stats' ? (
+                <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+              ) : (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              )}
+              Tải Báo Cáo Tổng Hợp Nhật Ký Lô Phân Tích Chi Tiết ({filtered.length} lô)
             </button>
-          ))}
-        </div>
-
-        {/* Row 1: KPI + Donut | Trend chart */}
-        <div className="grid grid-cols-12 gap-4">
-          {/* Left column */}
-          <div className="col-span-12 space-y-4 lg:col-span-4">
-            <KpiCard kpis={kpis} />
-            <DonutCard pieData={pieData} />
           </div>
 
-          {/* Right column – trend */}
-          <div className="col-span-12 lg:col-span-8">
-            <TrendCard trendData={trendData} />
-          </div>
+          {/* Row 4: How It Works */}
+          <HowItWorksStrip />
+
+          {/* Footer */}
+          <p className="pb-2 text-center text-[11px] text-slate-400">
+            Hệ thống DetectSteel AI © 2023 &mdash; Phát triển bởi Đội ngũ R&amp;D · Giải pháp kiểm định chất lượng thép thông minh.
+          </p>
         </div>
-
-        {/* Row 2: Log table */}
-        <LogTable
-          rows={filtered}
-          onViewPDF={handleViewPDF}
-          onReanalyze={handleReanalyze}
-          downloadingId={downloadingId}
-        />
-
-        {/* Row 3: How It Works */}
-        <HowItWorksStrip />
-
-        {/* Footer */}
-        <p className="pb-2 text-center text-[11px] text-slate-400">
-          Hệ thống DetectSteel AI © 2023 &mdash; Phát triển bởi Đội ngũ R&amp;D · Giải pháp kiểm định chất lượng thép thông minh.
-        </p>
-      </div>
-    </section>
+      </section>
 
       {/* Detail modal */}
       {modalItem && (

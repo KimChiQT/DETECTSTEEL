@@ -21,7 +21,7 @@ function Box({ b }) {
         className="absolute -top-5 left-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold text-white shadow"
         style={{ background: labelBg }}
       >
-        {b.label} ({Math.round(b.confidence * 100)}%)
+        {b.label}
       </div>
     </div>
   )

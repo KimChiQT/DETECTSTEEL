@@ -45,15 +45,15 @@ export default function Hero({ onDemo }) {
         </p>
 
         {/* Stats row */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 md:gap-10">
+        <div className="mt-10 flex flex-wrap items-center justify-center gap-8 md:gap-12">
           {[
             { value: '6', label: 'Loại lỗi thép' },
             { value: '95%+', label: 'Độ chính xác' },
             { value: 'Real-time', label: 'Phân tích' },
           ].map((s) => (
             <div key={s.label} className="flex flex-col items-center">
-              <span className="text-2xl font-black text-white md:text-3xl">{s.value}</span>
-              <span className="mt-0.5 text-xs font-medium uppercase tracking-wider text-slate-400">{s.label}</span>
+              <span className="text-3xl font-black text-white md:text-4xl">{s.value}</span>
+              <span className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">{s.label}</span>
             </div>
           ))}
         </div>

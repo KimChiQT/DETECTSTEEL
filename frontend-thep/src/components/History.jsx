@@ -87,7 +87,7 @@ async function downloadPDF(it) {
       const format = it.imageData.startsWith('data:image/png') ? 'PNG' : 'JPEG'
       pdf.addImage(it.imageData, format, margin, y, W - margin * 2, 200)
       y += 214
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // Table header
@@ -177,8 +177,8 @@ function DetailModal({ item, onClose, onDownloadPDF, downloading }) {
             <button onClick={onDownloadPDF} disabled={downloading}
               className="flex items-center gap-1.5 rounded-lg bg-[#1E3A8A] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#172554] disabled:opacity-60">
               {downloading
-                ? <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                : <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}
+                ? <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                : <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
               Tải PDF
             </button>
             <button onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Đóng</button>
@@ -232,6 +232,9 @@ export default function History() {
   const [downloadingId, setDownloadingId] = useState(null)
   const [undo, setUndo] = useState(null)
   const [source, setSource] = useState('api') // 'api' | 'local'
+  const [filterMonth, setFilterMonth] = useState('')
+  const [filterYear, setFilterYear] = useState('')
+  const [filterDate, setFilterDate] = useState('')
 
   /* ── Load from API, fallback to localStorage ── */
   const loadItems = async () => {
@@ -323,8 +326,130 @@ export default function History() {
     finally { setDownloadingId(null) }
   }
 
+  /* ── Download all filtered items as PDF ── */
+  const handleDownloadAllPDF = async () => {
+    if (filteredItems.length === 0) {
+      alert('Không có dữ liệu để tải.')
+      return
+    }
+    setDownloadingId('all')
+    try {
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+      const W = pdf.internal.pageSize.getWidth()
+      const margin = 40
+      let y = margin
+
+      // Header
+      pdf.setFillColor(30, 58, 138)
+      pdf.rect(margin, y, W - margin * 2, 36, 'F')
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'bold')
+      pdfText(pdf, 'DetectSteel — Báo cáo Tổng hợp Lịch sử Phân tích', margin + 10, y + 24)
+      y += 50
+
+      // Filter info
+      pdf.setTextColor(100, 116, 139)
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      const filterText = `Bộ lọc: ${filterYear ? `Năm ${filterYear}` : 'Tất cả năm'}${filterMonth ? `, Tháng ${filterMonth}` : ''}${filterDate ? `, Ngày ${filterDate}` : ''} — Tổng: ${filteredItems.length} mục`
+      pdfText(pdf, filterText, margin, y)
+      y += 18
+
+      pdf.setDrawColor(226, 232, 240)
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, y, W - margin, y)
+      y += 14
+
+      // Table header
+      pdf.setFillColor(248, 250, 252)
+      pdf.rect(margin, y, W - margin * 2, 20, 'F')
+      pdf.setDrawColor(226, 232, 240)
+      pdf.rect(margin, y, W - margin * 2, 20, 'S')
+      pdf.setTextColor(71, 85, 105)
+      pdf.setFontSize(8)
+      pdf.setFont('helvetica', 'bold')
+      pdfText(pdf, 'ID Lô', margin + 6, y + 13)
+      pdfText(pdf, 'Thời gian', margin + 80, y + 13)
+      pdfText(pdf, 'Tổng lỗi', margin + 200, y + 13)
+      pdfText(pdf, 'Lỗi lớn/nhỏ', margin + 280, y + 13)
+      pdfText(pdf, 'Quyết định', margin + 360, y + 13)
+      pdfText(pdf, 'Chi phí (VND)', W - margin - 6, y + 13, { align: 'right' })
+      y += 20
+
+      // Rows
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      filteredItems.forEach((it, idx) => {
+        if (y > pdf.internal.pageSize.getHeight() - 100) {
+          pdf.addPage()
+          y = margin
+        }
+        pdf.setFillColor(...(idx % 2 === 0 ? [255, 255, 255] : [248, 250, 252]))
+        pdf.rect(margin, y, W - margin * 2, 20, 'F')
+        pdf.setDrawColor(241, 245, 249)
+        pdf.line(margin, y + 20, W - margin, y + 20)
+        pdf.setTextColor(51, 65, 85)
+        pdfText(pdf, `#${it.lotCode}`, margin + 6, y + 13)
+        pdfText(pdf, fmtDate(it.ts), margin + 80, y + 13)
+        pdf.text(String(it.totalFault), margin + 200, y + 13)
+        pdf.text(`${it.majorCount}/${it.minorCount}`, margin + 280, y + 13)
+        pdfText(pdf, it.decision === 'repair' ? 'Sửa chữa' : 'Loại bỏ', margin + 360, y + 13)
+        const totalCost = (it.defects || []).reduce((s, d) => s + (Number(d.cost) || 0), 0)
+        pdf.text(fmt(totalCost), W - margin - 6, y + 13, { align: 'right' })
+        y += 20
+      })
+
+      // Summary
+      const totalEntries = filteredItems.length
+      const totalFaults = filteredItems.reduce((s, it) => s + (it.totalFault || 0), 0)
+      const totalCost = filteredItems.reduce((s, it) => s + (it.defects || []).reduce((ss, d) => ss + (Number(d.cost) || 0), 0), 0)
+      const repairCount = filteredItems.filter(it => it.decision === 'repair').length
+      const replaceCount = filteredItems.filter(it => it.decision === 'replace').length
+
+      y += 10
+      pdf.setFillColor(241, 245, 249)
+      pdf.rect(margin, y, W - margin * 2, 60, 'F')
+      pdf.setDrawColor(226, 232, 240)
+      pdf.rect(margin, y, W - margin * 2, 60, 'S')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(15, 23, 42)
+      pdf.setFontSize(10)
+      pdfText(pdf, 'TỔNG KẾT', margin + 10, y + 16)
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'normal')
+      pdfText(pdf, `Tổng mục: ${totalEntries}`, margin + 10, y + 32)
+      pdfText(pdf, `Tổng lỗi: ${totalFaults}`, margin + 10, y + 46)
+      pdfText(pdf, `Sửa chữa: ${repairCount} | Loại bỏ: ${replaceCount}`, margin + 200, y + 32)
+      pdfText(pdf, `Tổng chi phí: ${fmt(totalCost)} VND`, margin + 200, y + 46)
+      y += 70
+
+      // Footer
+      pdf.setFontSize(8)
+      pdf.setTextColor(148, 163, 184)
+      pdfText(pdf, 'Hệ thống DetectSteel AI © 2025 — Phát triển bởi Đội ngũ R&D', W / 2, pdf.internal.pageSize.getHeight() - 20, { align: 'center' })
+      pdf.save(`detectsteel-history-${filterYear || 'all'}-${filterMonth || 'all'}-${Date.now()}.pdf`)
+    } catch (e) {
+      alert('Không thể tạo PDF: ' + e.message)
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
   /* ── parsed items already normalized in loadItems ── */
   const parsed = items
+
+  /* ── Filter items by month/year ── */
+  const filteredItems = parsed.filter((it) => {
+    const date = new Date(it.ts)
+    const itemMonth = (date.getMonth() + 1).toString()
+    const itemYear = date.getFullYear().toString()
+    const itemDate = date.toISOString().split('T')[0] // YYYY-MM-DD
+    const matchMonth = !filterMonth || itemMonth === filterMonth
+    const matchYear = !filterYear || itemYear === filterYear
+    const matchDate = !filterDate || itemDate === filterDate
+    return matchMonth && matchYear && matchDate
+  })
 
   return (
     <section id="history-root" className="min-h-screen bg-[#F6F8FC] px-4 py-6 lg:px-6">
@@ -335,19 +460,51 @@ export default function History() {
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-extrabold text-slate-900">Lịch sử Phân tích</h2>
             {/* Source badge */}
-            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-              source === 'api'
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-amber-100 text-amber-700'
-            }`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${source === 'api'
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-amber-100 text-amber-700'
+              }`}>
               {source === 'api' ? '● API' : '● Local'}
             </span>
           </div>
-          <button onClick={loadItems}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
-            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
-            Làm mới
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Filter by year */}
+            <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 focus:border-[#1E3A8A] focus:outline-none">
+              <option value="">Tất cả năm</option>
+              {[...new Set(parsed.map(it => new Date(it.ts).getFullYear()))].sort((a, b) => b - a).map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            {/* Filter by month */}
+            <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 focus:border-[#1E3A8A] focus:outline-none">
+              <option value="">Tất cả tháng</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                <option key={month} value={month}>{month}</option>
+              ))}
+            </select>
+            {/* Filter by date */}
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 focus:border-[#1E3A8A] focus:outline-none"
+            />
+            {/* Download All */}
+            <button onClick={handleDownloadAllPDF} disabled={downloadingId === 'all'}
+              className="flex items-center gap-1.5 rounded-lg bg-[#1E3A8A] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#172554] disabled:opacity-60">
+              {downloadingId === 'all'
+                ? <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                : <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
+              Tải toàn bộ PDF
+            </button>
+            <button onClick={loadItems}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-4.5" /></svg>
+              Làm mới
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -356,7 +513,7 @@ export default function History() {
             <h5 className="text-sm font-bold uppercase tracking-wider text-slate-800">
               NHẬT KÝ PHÂN TÍCH CHI TIẾT
               <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
-                {parsed.length} mục
+                {filteredItems.length} mục {filterYear && `Năm ${filterYear}`}{filterMonth && `, Tháng ${filterMonth}`}{filterDate && `, Ngày ${filterDate}`}{(filterYear || filterMonth || filterDate) ? '' : ''}
               </span>
             </h5>
           </div>
@@ -381,7 +538,7 @@ export default function History() {
                   <tr>
                     <td colSpan={9} className="py-10 text-center text-sm text-slate-400">
                       <div className="flex items-center justify-center gap-2">
-                        <svg className="h-4 w-4 animate-spin text-[#1E3A8A]" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                        <svg className="h-4 w-4 animate-spin text-[#1E3A8A]" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
                         Đang tải dữ liệu...
                       </div>
                     </td>
@@ -392,16 +549,16 @@ export default function History() {
                     <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <svg className="h-10 w-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
-                          <rect x="9" y="3" width="6" height="4" rx="1"/>
-                          <path d="M9 12h6M9 16h4"/>
+                          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                          <rect x="9" y="3" width="6" height="4" rx="1" />
+                          <path d="M9 12h6M9 16h4" />
                         </svg>
                         Chưa có lịch sử phân tích nào.
                       </div>
                     </td>
                   </tr>
                 )}
-                {!loading && parsed.map((it) => {
+                {!loading && filteredItems.map((it) => {
                   const isRepair = it.decision === 'repair'
                   const isDownloading = downloadingId === it.id
                   return (
@@ -439,21 +596,21 @@ export default function History() {
                           {/* Xem chi tiết */}
                           <button onClick={() => setModalItem(it)}
                             className="flex items-center gap-1 rounded-md bg-[#1E3A8A] px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-[#172554]">
-                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                             Xem
                           </button>
                           {/* Tải PDF */}
                           <button onClick={() => handleDownloadPDF(it)} disabled={isDownloading}
                             className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-[#1E3A8A] hover:text-[#1E3A8A] disabled:opacity-60">
                             {isDownloading
-                              ? <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                              : <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>}
+                              ? <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                              : <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
                             PDF
                           </button>
                           {/* Xóa */}
                           <button onClick={() => handleDelete(it.id)}
                             className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600">
-                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>
                             Xóa
                           </button>
                         </div>

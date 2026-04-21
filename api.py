@@ -70,7 +70,7 @@ def draw_boxes_unicode(img_bgr: np.ndarray, boxes_data: list) -> np.ndarray:
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(img_rgb)
     draw = ImageDraw.Draw(pil_img)
-    font = _load_font(14)
+    font = _load_font(10)
 
     for b in boxes_data:
         x1, y1, x2, y2 = b["x1"], b["y1"], b["x2"], b["y2"]
@@ -136,7 +136,7 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
 
         boxes = yolo_results[0].boxes
         detected_faults = []
-        confidences = []
+        area_ratios = []
         total_estimated_cost = 0
         unique_faults = {}
 
@@ -151,15 +151,17 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
             cls_id = int(box.cls[0])
             raw_name = yolo_results[0].names[cls_id]
             fault_info = INFO_DICT.get(raw_name, {"vi": raw_name, "base_cost_vnd": 30000, "time": "N/A", "major": False})
-            label_text = f"{fault_info['vi']} ({int(conf * 100)}%)"
-            confidences.append(conf)
+            # % diện tích lỗi = vùng lỗi / diện tích ảnh * 100%
             area_ratio = max(0.0, min(1.0, ((x2 - x1) * (y2 - y1)) / float(max(1, W * H))))
+            area_pct = round(area_ratio, 1)
+            label_text = f"{fault_info['vi']}"
+            area_ratios.append(area_ratio)
             estimated_cost = int(fault_info["base_cost_vnd"] * (0.8 + conf * 0.6 + area_ratio * 1.2))
             total_estimated_cost += estimated_cost
             detected_faults.append({
                 "id": raw_name,
                 "name": fault_info["vi"],
-                "confidence": round(conf, 3),
+                "confidence": area_pct,
                 "cost": estimated_cost,
                 "time": fault_info["time"],
                 "major": bool(fault_info["major"]),
@@ -174,7 +176,7 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
             boxes_draw_data.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2,
                                      "label": label_text, "major": bool(fault_info["major"])})
 
-        avg_conf = (sum(confidences) / len(confidences) * 100) if confidences else 0.0
+        avg_conf = (sum(area_ratios) / len(area_ratios) * 100) if area_ratios else 0.0
 
         # Vẽ bounding box + label tiếng Việt bằng Pillow
         img_bgr = draw_boxes_unicode(img_bgr, boxes_draw_data)
@@ -249,7 +251,7 @@ async def analyze_image(file: UploadFile = File(...)):
     detected_faults = []
     unique_faults = {}
     avg_conf = 0
-    confidences = []
+    area_ratios = []
     total_estimated_cost = 0
 
     # Cấu hình chữ và khung
@@ -263,10 +265,12 @@ async def analyze_image(file: UploadFile = File(...)):
         raw_name = results[0].names[cls_id]
         
         fault_info = INFO_DICT.get(raw_name, {"vi": raw_name, "base_cost_vnd": 30000, "time": "N/A", "major": False})
-        label_text = f"{fault_info['vi']} ({int(conf * 100)}%)"
-        
-        confidences.append(conf)
+        # % diện tích lỗi = vùng lỗi / diện tích ảnh * 100%
         area_ratio = max(0.0, min(1.0, ((x2 - x1) * (y2 - y1)) / float(max(1, W * H))))
+        area_pct = round(area_ratio, 1)
+        label_text = f"{fault_info['vi']} "
+        
+        area_ratios.append(area_ratio)
         estimated_cost = int(fault_info["base_cost_vnd"] * (0.8 + conf * 0.6 + area_ratio * 1.2))
         total_estimated_cost += estimated_cost
 
@@ -274,7 +278,7 @@ async def analyze_image(file: UploadFile = File(...)):
             {
                 "id": raw_name,
                 "name": fault_info["vi"],
-                "confidence": round(conf, 3),
+                "confidence": area_pct,
                 "cost": estimated_cost,
                 "time": fault_info["time"],
                 "major": bool(fault_info["major"]),
@@ -290,8 +294,8 @@ async def analyze_image(file: UploadFile = File(...)):
         boxes_draw_data.append({"x1": x1, "y1": y1, "x2": x2, "y2": y2,
                                  "label": label_text, "major": bool(fault_info["major"])})
 
-    if confidences:
-        avg_conf = sum(confidences) / len(confidences) * 100
+    if area_ratios:
+        avg_conf = sum(area_ratios) / len(area_ratios) * 100
 
     # Vẽ bounding box + label tiếng Việt bằng Pillow
     img_bgr = draw_boxes_unicode(img_bgr, boxes_draw_data)

@@ -6,6 +6,13 @@ import AHPPanel from './AHPPanel'
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const fmt = (n) => Number(n || 0).toLocaleString('vi-VN')
 
+/* ── Parse time string like "~5-10 phút" to average number ── */
+const parseTime = (str) => {
+  const match = String(str || '').match(/~(\d+)-(\d+)/)
+  if (match) return (Number(match[1]) + Number(match[2])) / 2
+  return 0
+}
+
 /* ─────────────────────────────────────────────────────────── */
 /* Defect table                                                */
 /* ─────────────────────────────────────────────────────────── */
@@ -18,7 +25,8 @@ const DefectTable = ({ faults = [] }) => {
       <thead>
         <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <th className="py-2 text-left">Loại lỗi</th>
-          <th className="py-2 text-center">Độ tin cậy</th>
+          <th className="py-2 text-center">% Diện Tích Lỗi</th>
+          <th className="py-2 text-center">Thời gian giải quyết</th>
           <th className="py-2 text-right">Chi phí dự tính (VND)</th>
         </tr>
       </thead>
@@ -27,6 +35,7 @@ const DefectTable = ({ faults = [] }) => {
           <tr key={`${f.id}-${idx}`} className="border-b border-slate-100 last:border-0">
             <td className="py-2 font-medium text-slate-700">{f.label}</td>
             <td className="py-2 text-center text-slate-600">{(Number(f.confidence) * 100).toFixed(1)}%</td>
+            <td className="py-2 text-center text-slate-600">{f.time}</td>
             <td className="py-2 text-right font-semibold text-slate-800">{fmt(f.cost)}</td>
           </tr>
         ))}
@@ -69,14 +78,18 @@ const StatusCard = ({ summary }) => {
 
       {/* Extra stats from API */}
       {summary.fault_count > 0 && (
-        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
+        <div className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-100 pt-3">
           <div className="text-center">
             <p className="text-[10px] text-slate-400">Tổng lỗi</p>
             <p className="text-base font-black text-slate-800">{summary.fault_count}</p>
           </div>
           <div className="text-center">
-            <p className="text-[10px] text-slate-400">Độ tin cậy TB</p>
+            <p className="text-[10px] text-slate-400">Diện Tích Lỗi TB</p>
             <p className="text-base font-black text-slate-800">{summary.avg_conf?.toFixed(1)}%</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-slate-400">Thời gian giải quyết TB</p>
+            <p className="text-base font-black text-slate-800">{summary.avg_time?.toFixed(1)} phút</p>
           </div>
           <div className="text-center">
             <p className="text-[10px] text-slate-400">Xử lý</p>
@@ -105,9 +118,8 @@ const ResultCard = ({ repairScore, replaceScore, decision }) => {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <p className="mb-1 text-xs font-semibold text-slate-500">Lời khuyên:</p>
       <p
-        className={`text-xl font-black tracking-tight ${
-          isRepair ? 'text-emerald-700' : 'text-rose-700'
-        }`}
+        className={`text-xl font-black tracking-tight ${isRepair ? 'text-emerald-700' : 'text-rose-700'
+          }`}
       >
         {isRepair ? 'NÊN SỬA CHỮA' : 'NÊN LOẠI BỎ'}
       </p>
@@ -196,6 +208,7 @@ export default function Dashboard() {
     warning_count: 0,
     fault_count: 0,
     avg_conf: 0,
+    avg_time: 0,
     process_time: 0,
     total_estimated_cost: 0,
   })
@@ -222,6 +235,7 @@ export default function Dashboard() {
     label: f.name || f.id,
     confidence: Number(f.confidence || 0),
     cost: Number(f.cost || 0),
+    time: f.time,
     major: Boolean(f.major),
     x: Number(f.bbox?.x || 0),
     y: Number(f.bbox?.y || 0),
@@ -271,6 +285,7 @@ export default function Dashboard() {
         warning_count: data.warning_count ?? 0,
         fault_count: data.fault_count ?? mappedFaults.length,
         avg_conf: data.avg_conf ?? 0,
+        avg_time: mappedFaults.length ? mappedFaults.map(f => parseTime(f.time)).reduce((a, b) => a + b, 0) / mappedFaults.length : 0,
         process_time: data.process_time ?? 0,
         total_estimated_cost: data.total_estimated_cost ?? 0,
       })
@@ -366,7 +381,7 @@ export default function Dashboard() {
           </aside>
 
           {/* Center – detection viewer + defect table */}
-          <main className="col-span-12 lg:col-span-6">
+          <main className="col-span-12 lg:col-span-5">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <DetectionViewer image={selectedImage} defects={defects} loading={loading} />
               <div className="mt-4">
@@ -382,7 +397,7 @@ export default function Dashboard() {
           </main>
 
           {/* Right – status + AHP + result */}
-          <aside className="col-span-12 space-y-3 lg:col-span-3">
+          <aside className="col-span-12 space-y-3 lg:col-span-4">
             <StatusCard summary={summary} />
 
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

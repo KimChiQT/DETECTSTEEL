@@ -19,14 +19,15 @@ function fileToObj(file) {
 function BBoxOverlay({ faults = [] }) {
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {faults.map((f, i) => {
+      {faults.map((f) => {
         const isMajor = f.major
         const border = isMajor ? '#ef4444' : '#eab308'
         const bg = isMajor ? 'rgba(239,68,68,0.08)' : 'rgba(234,179,8,0.08)'
         const chip = isMajor ? '#ef4444' : '#ca8a04'
+        const stableKey = `${f.id || f.name || f.label}-${f.bbox?.x || 0}-${f.bbox?.y || 0}`
         return (
           <div
-            key={i}
+            key={stableKey}
             className="absolute"
             style={{ left: `${f.bbox?.x ?? f.x}%`, top: `${f.bbox?.y ?? f.y}%`, width: `${f.bbox?.w ?? f.w}%`, height: `${f.bbox?.h ?? f.h}%` }}
           >
@@ -53,18 +54,21 @@ function DefectTable({ faults = [], totalCost = 0 }) {
       <thead>
         <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <th className="py-2 text-left">Loại lỗi</th>
-          <th className="py-2 text-center">Độ tin cậy</th>
+          <th className="py-2 text-center">% Diện Tích Lỗi</th>
           <th className="py-2 text-right">Chi phí dự tính</th>
         </tr>
       </thead>
       <tbody>
-        {faults.map((f, i) => (
-          <tr key={i} className="border-b border-slate-100 last:border-0">
-            <td className="py-2 font-medium text-slate-700">{f.name || f.label}</td>
-            <td className="py-2 text-center text-slate-600">{Number(f.confidence).toFixed(2)}</td>
-            <td className="py-2 text-right font-semibold text-slate-800">{fmt(f.cost)}</td>
-          </tr>
-        ))}
+        {faults.map((f) => {
+          const faultKey = `${f.id || f.name}-${f.confidence || 0}`
+          return (
+            <tr key={faultKey} className="border-b border-slate-100 last:border-0">
+              <td className="py-2 font-medium text-slate-700">{f.name || f.label}</td>
+              <td className="py-2 text-center text-slate-600">{Number(f.confidence).toFixed(2)}</td>
+              <td className="py-2 text-right font-semibold text-slate-800">{fmt(f.cost)}</td>
+            </tr>
+          )
+        })}
       </tbody>
       <tfoot>
         <tr className="border-t-2 border-slate-200">
@@ -92,20 +96,20 @@ function SummaryPanel({ images, selectedImg, onGoAHP }) {
   return (
     <div className="flex flex-col gap-4">
       {/* Header */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <p className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-500">
           TÓM TẮT LÔ &amp; GỢI Ý
         </p>
 
         {/* ĐỌC KẾT QUẢ LÔ */}
-        <div className="mb-4 flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">🤖</div>
+        <div className="mb-5 flex gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-2xl">🤖</div>
           <div>
-            <p className="text-xs font-bold text-slate-800">ĐỌC KẾT QUẢ LÔ</p>
+            <p className="text-sm font-bold text-slate-800">ĐỌC KẾT QUẢ LÔ</p>
             {done.length === 0 ? (
-              <p className="mt-0.5 text-[11px] text-slate-500">Chưa có ảnh nào được phân tích.</p>
+              <p className="mt-1 text-xs text-slate-500">Chưa có ảnh nào được phân tích.</p>
             ) : (
-              <p className="mt-0.5 text-[11px] leading-snug text-slate-600">
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
                 Lô ảnh gồm <strong>{images.length}</strong> hình ảnh. Đã phát hiện{' '}
                 <strong>{totalFaults}</strong> lỗi
                 {majorImg && majorImg.result?.warning_count > 0
@@ -120,21 +124,21 @@ function SummaryPanel({ images, selectedImg, onGoAHP }) {
         </div>
 
         {/* GỢI Ý SƠ BỘ */}
-        <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">⚖️</div>
+        <div className="flex gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-2xl">⚖️</div>
           <div>
-            <p className="text-xs font-bold text-slate-800">GỢI Ý SƠ BỘ</p>
+            <p className="text-sm font-bold text-slate-800">GỢI Ý SƠ BỘ</p>
             {majorImg && majorImg.result?.warning_count > 0 ? (
-              <p className="mt-0.5 text-[11px] leading-snug text-slate-600">
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
                 Dựa trên kết quả phân tích AI, ảnh <strong>{majorImg.name}</strong> có lỗi nghiêm
                 trọng. Cần đánh giá kỹ lưỡng để đưa ra quyết định Sửa chữa hay Loại bỏ tối ưu.
               </p>
             ) : done.length > 0 ? (
-              <p className="mt-0.5 text-[11px] leading-snug text-slate-600">
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
                 Không phát hiện lỗi nghiêm trọng. Lô ảnh có thể tiếp tục sản xuất.
               </p>
             ) : (
-              <p className="mt-0.5 text-[11px] text-slate-500">Phân tích lô để nhận gợi ý.</p>
+              <p className="mt-1 text-xs text-slate-500">Phân tích lô để nhận gợi ý.</p>
             )}
           </div>
         </div>
@@ -369,9 +373,9 @@ export default function BatchAnalysis({ onGoAHP }) {
                     const active = selectedId === img.id
                     const statusRing =
                       img.status === 'done' ? 'border-emerald-400 ring-emerald-200' :
-                      img.status === 'analyzing' ? 'border-blue-400 ring-blue-200 animate-pulse' :
-                      img.status === 'error' ? 'border-red-400 ring-red-200' :
-                      active ? 'border-[#1E3A8A] ring-[#1E3A8A]/20' : 'border-slate-200'
+                        img.status === 'analyzing' ? 'border-blue-400 ring-blue-200 animate-pulse' :
+                          img.status === 'error' ? 'border-red-400 ring-red-200' :
+                            active ? 'border-[#1E3A8A] ring-[#1E3A8A]/20' : 'border-slate-200'
                     return (
                       <div
                         key={img.id}
@@ -391,8 +395,8 @@ export default function BatchAnalysis({ onGoAHP }) {
                           {img.status === 'analyzing' && (
                             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-500">
                               <svg className="h-2.5 w-2.5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                               </svg>
                             </span>
                           )}
@@ -439,8 +443,8 @@ export default function BatchAnalysis({ onGoAHP }) {
                   {analyzing ? (
                     <>
                       <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>
                       Đang phân tích...
                     </>
@@ -479,8 +483,8 @@ export default function BatchAnalysis({ onGoAHP }) {
                   {selectedImg.status === 'analyzing' && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-900/50">
                       <svg className="h-8 w-8 animate-spin text-white" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                       </svg>
                       <p className="text-sm font-semibold text-white">AI đang phân tích...</p>
                     </div>

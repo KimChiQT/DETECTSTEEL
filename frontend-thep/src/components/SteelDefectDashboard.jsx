@@ -37,7 +37,7 @@ const SteelDefectDashboard = () => {
             <figure className="relative">
               {/* Ảnh thu nhỏ lại để cân đối */}
               <img src={res.imageUrl} alt="Steel Surface" className="w-full h-64 object-cover" />
-              
+
               {/* Khoanh vùng lỗi: Chỉ dùng border, không tô màu vùng lỗi */}
               {res.defects.map((defect) => (
                 <div
@@ -53,7 +53,7 @@ const SteelDefectDashboard = () => {
                 />
               ))}
             </figure>
-            
+
             <div className="card-body p-4">
               <div className="flex justify-between items-center text-lg font-semibold">
                 <span>Ảnh ID: #{res.id}</span>
@@ -66,11 +66,11 @@ const SteelDefectDashboard = () => {
 
       {/* Section Thống kê & Chi phí */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        
+
         {/* Bảng thống kê lỗi */}
         <div className="xl:col-span-2 card bg-base-100 shadow-xl p-6">
           <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-             Bảng Thống Kê Chi Tiết
+            Bảng Thống Kê Chi Tiết
           </h2>
           <div className="overflow-x-auto">
             <table className="table table-zebra w-full text-lg">
