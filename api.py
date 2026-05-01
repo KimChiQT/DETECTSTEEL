@@ -6,10 +6,19 @@ import cv2
 import numpy as np
 import base64
 import time
-from typing import Dict
+from typing import Dict, List
 from PIL import Image, ImageDraw, ImageFont
 import io
 import os
+import sys
+import importlib.util
+
+# Import MCDM Calculator directly without triggering backend.app.__init__
+mcdm_path = os.path.join(os.path.dirname(__file__), 'backend', 'app', 'utils', 'mcdm_methods.py')
+spec = importlib.util.spec_from_file_location("mcdm_methods", mcdm_path)
+mcdm_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mcdm_module)
+MCDMCalculator = mcdm_module.MCDMCalculator
 
 app = FastAPI()
 
@@ -25,6 +34,9 @@ model = YOLO('best.pt')
 
 # In-memory history store (simple dev storage)
 HISTORIES = []
+
+# Historical data for Entropy method (stores normalized criteria values)
+HISTORICAL_MCDM_DATA = []
 
 INFO_DICT: Dict[str, Dict] = {
     "rolled_in_scale": {"vi": "Vảy cán", "base_cost_vnd": 35000, "time": "~5-10 phút", "major": False},
@@ -130,7 +142,7 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
             continue
 
         H, W, _ = img_bgr.shape
-        yolo_results = model(img_bgr)
+        yolo_results = model(img_bgr, conf=0.15)
         yolo_results[0].names[3] = 'pitted_surface'
         yolo_results[0].names[4] = 'rolled_in_scale'
 
@@ -162,6 +174,7 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
                 "id": raw_name,
                 "name": fault_info["vi"],
                 "confidence": area_pct,
+                "conf": round(conf * 100, 1),
                 "cost": estimated_cost,
                 "time": fault_info["time"],
                 "major": bool(fault_info["major"]),
@@ -187,14 +200,39 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
         major_count = len([f for f in detected_faults if f["major"]])
         warning_count = major_count
         fc = len(boxes)
-        conf_frac = avg_conf / 100.0
-        risk = conf_frac * (fc / (fc + 1.0))
-        if fc > 0:
-            risk += 0.1 * (major_count / fc)
-            risk = max(0.0, min(1.0, risk))
-        repair_score = round(max(0.0, min(1.0, 1.0 - risk)), 3)
-        replace_score = round(max(0.0, min(1.0, risk)), 3)
-        decision = 'repair' if repair_score >= replace_score else 'replace'
+        
+        # ═══════════════════════════════════════════════════════════
+        # MCDM CALCULATION - 3 Methods + Aggregation
+        # ═══════════════════════════════════════════════════════════
+        mcdm_results = MCDMCalculator.calculate_all(
+            avg_confidence=avg_conf,
+            fault_count=fc,
+            major_count=major_count,
+            cost_weight=3,
+            time_weight=3,
+            area_weight=3,
+            historical_data=HISTORICAL_MCDM_DATA if len(HISTORICAL_MCDM_DATA) >= 3 else None,
+            method_weights={'ahp': 0.4, 'topsis': 0.3, 'entropy': 0.3}
+        )
+        
+        repair_score = mcdm_results['aggregated']['repair_score']
+        replace_score = mcdm_results['aggregated']['replace_score']
+        decision = mcdm_results['aggregated']['decision']
+        
+        # Store for Entropy
+        conf_frac = avg_conf / 100.0 if avg_conf else 0.0
+        cost_risk = conf_frac
+        time_risk = fc / (fc + 3.0)
+        area_risk = (major_count / fc) if fc > 0 else 0.0
+        
+        HISTORICAL_MCDM_DATA.append({
+            'cost': cost_risk,
+            'time': time_risk,
+            'area': area_risk
+        })
+        
+        if len(HISTORICAL_MCDM_DATA) > 100:
+            HISTORICAL_MCDM_DATA.pop(0)
 
         batch_total_cost += total_estimated_cost
         batch_total_faults += fc
@@ -214,6 +252,7 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
             "repairScore": repair_score,
             "replaceScore": replace_score,
             "decision": decision,
+            "mcdm": mcdm_results  # Add MCDM results
         }
         HISTORIES.insert(0, entry)
         results_list.append(entry)
@@ -243,7 +282,7 @@ async def analyze_image(file: UploadFile = File(...)):
     H, W, _ = img_bgr.shape
     
     # Chạy YOLO
-    results = model(img_bgr)
+    results = model(img_bgr, conf=0.15)
     results[0].names[3] = 'pitted_surface'
     results[0].names[4] = 'rolled_in_scale'
     
@@ -279,6 +318,7 @@ async def analyze_image(file: UploadFile = File(...)):
                 "id": raw_name,
                 "name": fault_info["vi"],
                 "confidence": area_pct,
+                "conf": round(conf * 100, 1),
                 "cost": estimated_cost,
                 "time": fault_info["time"],
                 "major": bool(fault_info["major"]),
@@ -308,20 +348,44 @@ async def analyze_image(file: UploadFile = File(...)):
     img_base64 = base64.b64encode(buffer).decode('utf-8')
     process_time = round(time.time() - start_time, 2)
 
-    # Simple AHP-like scoring derived from detections
-    # avg_conf is percentage (0-100). Convert to fraction.
-    conf_frac = (avg_conf / 100.0) if avg_conf else 0.0
+    # ═══════════════════════════════════════════════════════════
+    # MCDM CALCULATION - 3 Methods + Aggregation
+    # ═══════════════════════════════════════════════════════════
     fc = len(boxes)
-    # risk increases with avg confidence and number of faults
-    risk = conf_frac * (fc / (fc + 1.0))
-    if fc > 0:
-        major_count = len([f for f in detected_faults if f["major"]])
-        risk += 0.1 * (major_count / fc)
-        risk = max(0.0, min(1.0, risk))
-    # repairScore biased towards repair for low risk, replace for high risk
-    repair_score = round(max(0.0, min(1.0, 1.0 - risk)), 3)
-    replace_score = round(max(0.0, min(1.0, 1.0 - repair_score)), 3)
-    decision = 'repair' if repair_score >= replace_score else 'replace'
+    major_count = len([f for f in detected_faults if f["major"]])
+    
+    # Calculate all 3 MCDM methods + aggregation
+    mcdm_results = MCDMCalculator.calculate_all(
+        avg_confidence=avg_conf,
+        fault_count=fc,
+        major_count=major_count,
+        cost_weight=3,  # Default AHP weights
+        time_weight=3,
+        area_weight=3,
+        historical_data=HISTORICAL_MCDM_DATA if len(HISTORICAL_MCDM_DATA) >= 3 else None,
+        method_weights={'ahp': 0.4, 'topsis': 0.3, 'entropy': 0.3}  # AHP slightly higher
+    )
+    
+    # Use aggregated result as main decision
+    repair_score = mcdm_results['aggregated']['repair_score']
+    replace_score = mcdm_results['aggregated']['replace_score']
+    decision = mcdm_results['aggregated']['decision']
+    
+    # Store normalized data for Entropy method (for future calculations)
+    conf_frac = avg_conf / 100.0 if avg_conf else 0.0
+    cost_risk = conf_frac
+    time_risk = fc / (fc + 3.0)
+    area_risk = (major_count / fc) if fc > 0 else 0.0
+    
+    HISTORICAL_MCDM_DATA.append({
+        'cost': cost_risk,
+        'time': time_risk,
+        'area': area_risk
+    })
+    
+    # Keep only last 100 records for Entropy
+    if len(HISTORICAL_MCDM_DATA) > 100:
+        HISTORICAL_MCDM_DATA.pop(0)
 
     # Create history entry and append to in-memory store
     entry_id = int(time.time() * 1000)
@@ -339,6 +403,7 @@ async def analyze_image(file: UploadFile = File(...)):
         "repairScore": repair_score,
         "replaceScore": replace_score,
         "decision": decision,
+        "mcdm": mcdm_results  # Add full MCDM results
     }
     HISTORIES.insert(0, entry)
 
@@ -355,6 +420,7 @@ async def analyze_image(file: UploadFile = File(...)):
         "repairScore": entry["repairScore"],
         "replaceScore": entry["replaceScore"],
         "decision": entry["decision"],
+        "mcdm": mcdm_results  # Return MCDM results to frontend
     }
     return resp
 
@@ -362,14 +428,23 @@ async def analyze_image(file: UploadFile = File(...)):
 @app.post("/ahp")
 async def compute_ahp(payload: dict):
     """
-    Recompute AHP scores using user-supplied weights.
-    Body: { "entry_id": int, "cost_weight": int, "time_weight": int, "area_weight": int }
-    Returns updated repairScore, replaceScore, decision.
+    Recompute MCDM scores using user-supplied weights.
+    Body: { 
+        "entry_id": int, 
+        "cost_weight": int, 
+        "time_weight": int, 
+        "area_weight": int,
+        "method_weights": {"ahp": float, "topsis": float, "entropy": float} (optional)
+    }
+    Returns updated repairScore, replaceScore, decision with all 3 methods.
     """
     entry_id = payload.get("entry_id")
     cost_w = max(1, min(9, int(payload.get("cost_weight", 3))))
     time_w = max(1, min(9, int(payload.get("time_weight", 3))))
     area_w = max(1, min(9, int(payload.get("area_weight", 3))))
+    
+    # Optional: method weights for aggregation
+    method_weights = payload.get("method_weights", {'ahp': 0.4, 'topsis': 0.3, 'entropy': 0.3})
 
     # Find the history entry to get fault data
     entry = next((h for h in HISTORIES if h["id"] == entry_id), None)
@@ -379,32 +454,29 @@ async def compute_ahp(payload: dict):
     faults = entry.get("faults", [])
     fault_count = len(faults)
     major_count = len([f for f in faults if f.get("major")])
-    avg_conf_frac = (entry.get("avg_conf", 0) / 100.0)
+    avg_conf = entry.get("avg_conf", 0)
 
-    # Weighted AHP-style scoring
-    # Normalise weights to 0-1
-    w_cost = cost_w / 9.0
-    w_time = time_w / 9.0
-    w_area = area_w / 9.0
-    w_sum = w_cost + w_time + w_area or 1.0
-
-    # Risk factors
-    conf_risk = avg_conf_frac
-    fault_risk = fault_count / (fault_count + 3.0)
-    major_risk = (major_count / fault_count) if fault_count else 0.0
-
-    # Weighted risk
-    risk = (w_cost * conf_risk + w_time * fault_risk + w_area * major_risk) / w_sum
-    risk = max(0.0, min(1.0, risk))
-
-    repair_score = round(max(0.0, min(1.0, 1.0 - risk)), 3)
-    replace_score = round(max(0.0, min(1.0, risk)), 3)
-    decision = "repair" if repair_score >= replace_score else "replace"
+    # Recalculate with new weights using all 3 methods
+    mcdm_results = MCDMCalculator.calculate_all(
+        avg_confidence=avg_conf,
+        fault_count=fault_count,
+        major_count=major_count,
+        cost_weight=cost_w,
+        time_weight=time_w,
+        area_weight=area_w,
+        historical_data=HISTORICAL_MCDM_DATA if len(HISTORICAL_MCDM_DATA) >= 3 else None,
+        method_weights=method_weights
+    )
+    
+    repair_score = mcdm_results['aggregated']['repair_score']
+    replace_score = mcdm_results['aggregated']['replace_score']
+    decision = mcdm_results['aggregated']['decision']
 
     # Update stored entry
     entry["repairScore"] = repair_score
     entry["replaceScore"] = replace_score
     entry["decision"] = decision
+    entry["mcdm"] = mcdm_results
 
     return {
         "entry_id": entry_id,
@@ -414,6 +486,7 @@ async def compute_ahp(payload: dict):
         "cost_weight": cost_w,
         "time_weight": time_w,
         "area_weight": area_w,
+        "mcdm": mcdm_results  # Return full MCDM breakdown
     }
 
 

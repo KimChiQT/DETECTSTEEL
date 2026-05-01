@@ -2,9 +2,9 @@ import React, { useRef, useState } from 'react'
 
 function Box({ b }) {
   const isMajor = b.major
-  const borderColor = isMajor ? '#ef4444' : '#84cc16'
-  const bgColor = isMajor ? 'rgba(239,68,68,0.08)' : 'rgba(132,204,22,0.10)'
-  const labelBg = isMajor ? '#ef4444' : '#84cc16'
+  const borderColor = isMajor ? '#ef4444' : '#22c55e'
+  const bgColor = isMajor ? 'rgba(239,68,68,0.10)' : 'rgba(34,197,94,0.10)'
+  const labelBg = isMajor ? '#dc2626' : '#16a34a'
 
   return (
     <div
@@ -16,12 +16,18 @@ function Box({ b }) {
         className="absolute inset-0 rounded-sm"
         style={{ border: `2px solid ${borderColor}`, background: bgColor }}
       />
-      {/* Label chip */}
+      {/* Label chip — hiển thị bên trong góc trên-trái nếu không đủ chỗ phía trên */}
       <div
-        className="absolute -top-5 left-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold text-white shadow"
-        style={{ background: labelBg }}
+        className="absolute left-0 whitespace-nowrap rounded px-2 py-0.5 text-[11px] font-bold text-white"
+        style={{
+          background: labelBg,
+          top: b.y > 8 ? '-22px' : '2px',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.55)',
+          letterSpacing: '0.01em',
+          lineHeight: '1.5',
+        }}
       >
-        {b.label}
+        {b.label} <span style={{ opacity: 0.9 }}>({Number(b.conf || 0).toFixed(1)}%)</span>
       </div>
     </div>
   )

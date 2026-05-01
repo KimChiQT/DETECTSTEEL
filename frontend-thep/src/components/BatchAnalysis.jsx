@@ -19,12 +19,13 @@ function fileToObj(file) {
 function BBoxOverlay({ faults = [] }) {
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {faults.map((f) => {
+      {faults.map((f, idx) => {
         const isMajor = f.major
-        const border = isMajor ? '#ef4444' : '#eab308'
-        const bg = isMajor ? 'rgba(239,68,68,0.08)' : 'rgba(234,179,8,0.08)'
-        const chip = isMajor ? '#ef4444' : '#ca8a04'
-        const stableKey = `${f.id || f.name || f.label}-${f.bbox?.x || 0}-${f.bbox?.y || 0}`
+        const border = isMajor ? '#ef4444' : '#22c55e'
+        const bg = isMajor ? 'rgba(239,68,68,0.10)' : 'rgba(34,197,94,0.10)'
+        const chip = isMajor ? '#dc2626' : '#16a34a'
+        const stableKey = `${f.id || f.name || f.label}-${f.bbox?.x || 0}-${f.bbox?.y || 0}-${idx}`
+        const top = (f.bbox?.y ?? f.y ?? 0)
         return (
           <div
             key={stableKey}
@@ -33,10 +34,16 @@ function BBoxOverlay({ faults = [] }) {
           >
             <div className="absolute inset-0 rounded-sm" style={{ border: `2px solid ${border}`, background: bg }} />
             <div
-              className="absolute -top-5 left-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] font-bold text-white shadow"
-              style={{ background: chip }}
+              className="absolute left-0 whitespace-nowrap rounded px-2 py-0.5 text-[11px] font-bold text-white"
+              style={{
+                background: chip,
+                top: top > 8 ? '-22px' : '2px',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.55)',
+                letterSpacing: '0.01em',
+                lineHeight: '1.5',
+              }}
             >
-              {f.name || f.label} ({Math.round((f.confidence ?? 0) * 100)}%)
+              {f.name || f.label} <span style={{ opacity: 0.9 }}>({Number(f.conf || 0).toFixed(1)}%)</span>
             </div>
           </div>
         )
@@ -55,16 +62,26 @@ function DefectTable({ faults = [], totalCost = 0 }) {
         <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <th className="py-2 text-left">Loại lỗi</th>
           <th className="py-2 text-center">% Diện Tích Lỗi</th>
+          <th className="py-2 text-center">Độ tin cậy</th>
           <th className="py-2 text-right">Chi phí dự tính</th>
         </tr>
       </thead>
       <tbody>
-        {faults.map((f) => {
-          const faultKey = `${f.id || f.name}-${f.confidence || 0}`
+        {faults.map((f, idx) => {
+          const faultKey = `${f.id || f.name}-${idx}`
           return (
             <tr key={faultKey} className="border-b border-slate-100 last:border-0">
               <td className="py-2 font-medium text-slate-700">{f.name || f.label}</td>
-              <td className="py-2 text-center text-slate-600">{Number(f.confidence).toFixed(2)}</td>
+              <td className="py-2 text-center text-slate-600">{Number(f.confidence).toFixed(1)}%</td>
+              <td className="py-2 text-center">
+                <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                  Number(f.conf) >= 80 ? 'bg-red-100 text-red-700' :
+                  Number(f.conf) >= 50 ? 'bg-amber-100 text-amber-700' :
+                  'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {Number(f.conf).toFixed(1)}%
+                </span>
+              </td>
               <td className="py-2 text-right font-semibold text-slate-800">{fmt(f.cost)}</td>
             </tr>
           )
@@ -72,7 +89,7 @@ function DefectTable({ faults = [], totalCost = 0 }) {
       </tbody>
       <tfoot>
         <tr className="border-t-2 border-slate-200">
-          <td colSpan={2} className="py-2 text-right text-xs font-semibold text-slate-500">Tổng</td>
+          <td colSpan={3} className="py-2 text-right text-xs font-semibold text-slate-500">Tổng</td>
           <td className="py-2 text-right font-black text-slate-900">{fmt(totalCost)} VND</td>
         </tr>
       </tfoot>

@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import ImageUploader from './ImageUploader'
 import DetectionViewer from './DetectionViewer'
 import AHPPanel from './AHPPanel'
+import FlawAttributesPanel from './FlawAttributesPanel'
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const fmt = (n) => Number(n || 0).toLocaleString('vi-VN')
@@ -26,6 +28,7 @@ const DefectTable = ({ faults = [] }) => {
         <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <th className="py-2 text-left">Loại lỗi</th>
           <th className="py-2 text-center">% Diện Tích Lỗi</th>
+          <th className="py-2 text-center">Độ tin cậy</th>
           <th className="py-2 text-center">Thời gian giải quyết</th>
           <th className="py-2 text-right">Chi phí dự tính (VND)</th>
         </tr>
@@ -34,7 +37,16 @@ const DefectTable = ({ faults = [] }) => {
         {faults.map((f, idx) => (
           <tr key={`${f.id}-${idx}`} className="border-b border-slate-100 last:border-0">
             <td className="py-2 font-medium text-slate-700">{f.label}</td>
-            <td className="py-2 text-center text-slate-600">{(Number(f.confidence) * 100).toFixed(1)}%</td>
+            <td className="py-2 text-center text-slate-600">{Number(f.confidence).toFixed(1)}%</td>
+            <td className="py-2 text-center">
+              <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                Number(f.conf) >= 80 ? 'bg-red-100 text-red-700' :
+                Number(f.conf) >= 50 ? 'bg-amber-100 text-amber-700' :
+                'bg-emerald-100 text-emerald-700'
+              }`}>
+                {Number(f.conf).toFixed(1)}%
+              </span>
+            </td>
             <td className="py-2 text-center text-slate-600">{f.time}</td>
             <td className="py-2 text-right font-semibold text-slate-800">{fmt(f.cost)}</td>
           </tr>
@@ -126,6 +138,230 @@ const ResultCard = ({ repairScore, replaceScore, decision }) => {
       <p className="mt-1 text-xs text-slate-500">
         Score Sửa: {repairScore.toFixed(3)} — Score Bỏ: {replaceScore.toFixed(3)}
       </p>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/* MCDM Results Panel - 3 Methods Display with Charts          */
+/* ─────────────────────────────────────────────────────────── */
+const MCDMResultsPanel = ({ mcdmData }) => {
+  if (!mcdmData) return null
+
+  const { aggregated, ahp, topsis, entropy } = mcdmData
+
+  // Prepare data for AHP Radar Chart
+  const ahpRadarData = ahp.weights ? [
+    { criterion: 'Area', value: ahp.weights.area, fullMark: 1 },
+    { criterion: 'Time', value: ahp.weights.time, fullMark: 1 },
+    { criterion: 'Cost', value: ahp.weights.cost, fullMark: 1 },
+  ] : []
+
+  // Prepare data for TOPSIS Bar Chart
+  const topsisBarData = [
+    { name: 'Sửa chữa', value: topsis.repair_score, color: '#10b981' },
+    { name: 'Hủy bỏ', value: topsis.replace_score, color: '#ef4444' },
+    { name: 'Chờ xử lý', value: 0.05, color: '#94a3b8' },
+  ]
+
+  // Prepare data for Entropy Bar Chart
+  const entropyBarData = entropy.weights ? [
+    { name: 'Cost', value: entropy.weights.cost * 100, color: '#3b82f6' },
+    { name: 'Time', value: entropy.weights.time * 100, color: '#8b5cf6' },
+    { name: 'Flaw Area', value: entropy.weights.area * 100, color: '#f59e0b' },
+    { name: 'Defect Shape', value: 10, color: '#6b7280' },
+  ] : []
+
+  return (
+    <div className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-lg">
+      {/* Header */}
+      <div className="mb-4 border-b-2 border-slate-200 pb-3">
+        <h2 className="text-center text-lg font-black uppercase tracking-wide text-slate-800">
+          METHODOLOGY COMPARISON & AGGREGATION
+        </h2>
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        
+        {/* LEFT: Entropy Method */}
+        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase text-blue-900">
+              PHƯƠNG PHÁP ENTROPY<br/>
+              <span className="text-xs font-normal">(KHÁCH QUAN)</span>
+            </h3>
+            <span className={`rounded-full px-2 py-1 text-xs font-bold ${
+              entropy.decision === 'repair' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+            }`}>
+              {entropy.decision === 'repair' ? 'SỬA' : 'BỎ'}
+            </span>
+          </div>
+
+          <p className="mb-3 text-xs text-slate-700">
+            TỰ ĐỘNG XÁC ĐỊNH TRỌNG SỐ<br/>
+            DỰA TRÊN DỮ LIỆU BẤT THỦ VÀ BIẾN ĐỘNG
+          </p>
+
+          {/* Entropy Bar Chart */}
+          <div className="mb-3 h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={entropyBarData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" domain={[0, 50]} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {entropyBarData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="rounded bg-white p-2 text-xs">
+            <p className="font-semibold text-slate-700">Góc nhìn Dữ liệu:</p>
+            <p className="text-slate-600">
+              Tiêu chí Cost biến động lớn nhất → quan trọng nhất.
+            </p>
+          </div>
+        </div>
+
+        {/* RIGHT: AHP Method */}
+        <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-black uppercase text-purple-900">
+              PHƯƠNG PHÁP AHP<br/>
+              <span className="text-xs font-normal">(CHỦ QUAN)</span>
+            </h3>
+            <span className={`rounded-full px-2 py-1 text-xs font-bold ${
+              ahp.decision === 'repair' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+            }`}>
+              {ahp.decision === 'repair' ? 'SỬA' : 'BỎ'}
+            </span>
+          </div>
+
+          <p className="mb-3 text-xs text-slate-700">
+            DỰA TRÊN KINH NGHIỆM CHUYÊN<br/>
+            GIA VÀ ĐÁNH GIÁ DỰA TIÊU CHÍ
+          </p>
+
+          {/* AHP Radar Chart */}
+          <div className="mb-3 flex h-40 items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={ahpRadarData}>
+                <PolarGrid stroke="#cbd5e1" />
+                <PolarAngleAxis dataKey="criterion" tick={{ fontSize: 10, fill: '#475569' }} />
+                <PolarRadiusAxis angle={90} domain={[0, 1]} tick={{ fontSize: 9 }} />
+                <Radar name="AHP" dataKey="value" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.6} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="rounded bg-white p-2 text-xs">
+            <p className="font-semibold text-slate-700">Góc nhìn Chuyên gia:</p>
+            <p className="text-slate-600">
+              Tiêu chí Costs: Ưu tiên chất lượng và tần dụng nguyên liệu.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* TOPSIS Section */}
+      <div className="mt-4 rounded-lg border-2 border-emerald-200 bg-emerald-50 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-black uppercase text-emerald-900">
+            XẾP HẠNG TOPSIS & ĐIỂM SỐ C*
+          </h3>
+          <span className="rounded bg-white px-2 py-1 text-xs font-bold text-slate-700">
+            C* = {topsis.repair_score.toFixed(2)}
+          </span>
+        </div>
+
+        {/* TOPSIS Bar Chart */}
+        <div className="mb-3 h-32">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={topsisBarData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+              <YAxis domain={[0, 1]} tick={{ fontSize: 10 }} />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                {topsisBarData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <p className="text-xs text-slate-700">
+          <span className="font-semibold">Xếp hạng tối ưu:</span> Gần D⁺ nhất; Xa D⁻ nhất.
+        </p>
+      </div>
+
+      {/* Aggregation Section */}
+      <div className="mt-4 rounded-lg border-2 border-indigo-300 bg-gradient-to-br from-indigo-100 to-white p-4">
+        <h3 className="mb-3 text-center text-sm font-black uppercase text-indigo-900">
+          TỔNG HỢP QUYẾT ĐỊNH & GẦN TRỌNG SỐ
+        </h3>
+
+        <div className="mb-3 text-center">
+          <p className="text-xs text-slate-700">
+            TỔNG ĐIỂM (C*) = {aggregated.method_weights?.ahp?.toFixed(2) || '0.40'}(AHP) + {aggregated.method_weights?.entropy?.toFixed(2) || '0.30'}(Entropy) + {aggregated.method_weights?.topsis?.toFixed(2) || '0.30'}(TOPSIS)
+          </p>
+          <p className="mt-1 text-lg font-black text-indigo-900">
+            Gần trọng số: AHP {(aggregated.method_weights?.ahp * 100 || 40).toFixed(0)}%, Entropy {(aggregated.method_weights?.entropy * 100 || 30).toFixed(0)}%, TOPSIS {(aggregated.method_weights?.topsis * 100 || 30).toFixed(0)}%
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-white p-3 text-center">
+          <p className="mb-1 text-xs text-slate-600">Trọng số dựa trên bối cảnh doanh nghiệp (coi trọng kinh nghiệm kĩ sư).</p>
+        </div>
+      </div>
+
+      {/* Final Decision */}
+      <div className={`mt-4 rounded-lg border-2 p-4 ${
+        aggregated.decision === 'repair' 
+          ? 'border-emerald-400 bg-emerald-50' 
+          : 'border-rose-400 bg-rose-50'
+      }`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold text-slate-600">KẾT LUẬN CUỐI CÙNG & ĐÁNH GIÁ ĐỘ NGHIÊM TRỌNG</p>
+            <h2 className={`mt-1 text-2xl font-black ${
+              aggregated.decision === 'repair' ? 'text-emerald-700' : 'text-rose-700'
+            }`}>
+              🎯 KHUYẾN NGHỊ: NÊN {aggregated.decision === 'repair' ? 'SỬA CHỮA' : 'LOẠI BỎ'} (C* = {aggregated.repair_score.toFixed(2)})
+            </h2>
+          </div>
+          <div className="text-center">
+            <div className={`flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
+              aggregated.decision === 'repair' ? 'bg-emerald-500' : 'bg-rose-500'
+            }`}>
+              {aggregated.decision === 'repair' ? '✓' : '✗'}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded bg-white p-3 text-xs text-slate-700">
+          <p className="font-semibold">
+            Sau khi tích hợp trong số (AHP chuyên gia + Entropy dữ liệu), thuật toán TOPSIS đánh giá phương án Sửa chữa là gần điểm lý tưởng nhất. Do nghiệm kĩ thuật đã xác nhận trên vùng chịu lực chính, nhưng việc sửa chữa mang lại hiệu quả chi phí và thời gian tối ưu so với Hủy bỏ.
+          </p>
+        </div>
+
+        {/* Voting */}
+        {aggregated.votes && (
+          <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+            <span className="font-semibold text-slate-700">Biểu quyết:</span>
+            <span className="text-emerald-700">✓ Sửa: {aggregated.votes.repair}/3</span>
+            <span className="text-slate-300">|</span>
+            <span className="text-rose-700">✗ Bỏ: {aggregated.votes.replace}/3</span>
+            <span className="ml-auto rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white">
+              Độ tin cậy: {(aggregated.confidence * 100).toFixed(0)}%
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -223,6 +459,7 @@ export default function Dashboard() {
   const [repairScore, setRepairScore] = useState(0)
   const [replaceScore, setReplaceScore] = useState(0)
   const [decision, setDecision] = useState(null)
+  const [mcdmResults, setMcdmResults] = useState(null) // Store full MCDM data
 
   const selectedImage = useMemo(
     () => images.find((img) => img.id === selectedId),
@@ -230,10 +467,11 @@ export default function Dashboard() {
   )
 
   /* ── Map API fault → internal shape ── */
-  const mapFault = (f) => ({
-    id: f.id,
+  const mapFault = (f, idx) => ({
+    id: `${f.id || 'fault'}-${idx}`,
     label: f.name || f.id,
-    confidence: Number(f.confidence || 0),
+    confidence: Number(f.confidence || 0),   // % diện tích lỗi
+    conf: Number(f.conf || 0),               // độ tin cậy YOLO (%)
     cost: Number(f.cost || 0),
     time: f.time,
     major: Boolean(f.major),
@@ -297,6 +535,7 @@ export default function Dashboard() {
       setReplaceScore(nextReplace)
       setDecision(nextDecision)
       setLastEntryId(data.id ?? null)
+      setMcdmResults(data.mcdm ?? null) // Store MCDM results
 
       // Persist for History / Stats
       persistHistory({
@@ -342,6 +581,7 @@ export default function Dashboard() {
       setRepairScore(Number(data.repairScore ?? 0))
       setReplaceScore(Number(data.replaceScore ?? 0))
       setDecision(data.decision ?? null)
+      setMcdmResults(data.mcdm ?? null) // Update MCDM results
     } catch (err) {
       setApiError(`Tính AHP thất bại: ${err.message}`)
     } finally {
@@ -394,9 +634,16 @@ export default function Dashboard() {
                 <DefectTable faults={defects} />
               </div>
             </div>
+
+            {/* Flaw Attributes Panel */}
+            {defects.length > 0 && (
+              <div className="mt-4">
+                <FlawAttributesPanel defects={defects} summary={summary} />
+              </div>
+            )}
           </main>
 
-          {/* Right – status + AHP + result */}
+          {/* Right – status + AHP + result + MCDM */}
           <aside className="col-span-12 space-y-3 lg:col-span-4">
             <StatusCard summary={summary} />
 
@@ -418,6 +665,9 @@ export default function Dashboard() {
             </div>
 
             <ResultCard repairScore={repairScore} replaceScore={replaceScore} decision={decision} />
+            
+            {/* MCDM Results Panel */}
+            <MCDMResultsPanel mcdmData={mcdmResults} />
           </aside>
         </div>
 
