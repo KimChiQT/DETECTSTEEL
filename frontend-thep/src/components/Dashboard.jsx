@@ -11,8 +11,102 @@ const fmt = (n) => Number(n || 0).toLocaleString('vi-VN')
 /* ── Parse time string like "~5-10 phút" to average number ── */
 const parseTime = (str) => {
   const match = String(str || '').match(/~(\d+)-(\d+)/)
-  if (match) return (Number(match[1]) + Number(match[2])) / 2
+  if (match) return (Number(match[1]) + NumFber(match[2])) / 2
   return 0
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/* Analyzed Images Sidebar                                     */
+/* ─────────────────────────────────────────────────────────── */
+const AnalyzedImagesSidebar = ({ analyzedImages, onSelect, selectedId }) => {
+  if (analyzedImages.length === 0) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h3 className="mb-3 text-sm font-bold text-slate-800">Ảnh đã phân tích</h3>
+        <p className="text-center text-xs text-slate-400">Chưa có ảnh nào được phân tích</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="mb-3 text-sm font-bold text-slate-800">
+        Ảnh đã phân tích ({analyzedImages.length})
+      </h3>
+      <div className="space-y-2 max-h-[600px] overflow-y-auto">
+        {analyzedImages.map((img) => (
+          <button
+            key={img.id}
+            onClick={() => onSelect(img)}
+            className={`w-full rounded-lg border-2 p-2 text-left transition-all hover:shadow-md ${
+              selectedId === img.id
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-slate-200 bg-white hover:border-blue-300'
+            }`}
+          >
+            {/* Thumbnail */}
+            <div className="mb-2 aspect-video w-full overflow-hidden rounded bg-slate-100">
+              <img
+                src={img.image_base64}
+                alt={img.name}
+                className="h-full w-full object-cover"
+              />
+            </div>
+
+            {/* Info */}
+            <div className="space-y-1">
+              <p className="truncate text-xs font-semibold text-slate-800">
+                {img.name}
+              </p>
+              
+              {/* Status Badge */}
+              <div className="flex items-center gap-1">
+                {img.summary.warning_count > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                    <span>⚠</span>
+                    {img.summary.warning_count} lỗi
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                    <span>✓</span>
+                    OK
+                  </span>
+                )}
+                
+                {/* Decision Badge */}
+                {img.decision && (
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    img.decision === 'repair'
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-rose-500 text-white'
+                  }`}>
+                    {img.decision === 'repair' ? 'SỬA' : 'BỎ'}
+                  </span>
+                )}
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-600">
+                <div>
+                  <span className="text-slate-400">Chi phí:</span>{' '}
+                  <span className="font-semibold">{fmt(img.summary.total_estimated_cost)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">C*:</span>{' '}
+                  <span className="font-semibold">{img.repairScore.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Timestamp */}
+              <p className="text-[9px] text-slate-400">
+                {new Date(img.timestamp).toLocaleString('vi-VN')}
+              </p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 /* ─────────────────────────────────────────────────────────── */
@@ -157,11 +251,13 @@ const MCDMResultsPanel = ({ mcdmData }) => {
     { criterion: 'Cost', value: ahp.weights.cost, fullMark: 1 },
   ] : []
 
-  // Prepare data for TOPSIS Bar Chart
+  // Prepare data for TOPSIS Bar Chart (for right column)
   const topsisBarData = [
-    { name: 'Sửa chữa', value: topsis.repair_score, color: '#10b981' },
-    { name: 'Hủy bỏ', value: topsis.replace_score, color: '#ef4444' },
-    { name: 'Chờ xử lý', value: 0.05, color: '#94a3b8' },
+    { name: 'Ideal', value: 0.5, label: 'D⁺', color: '#10b981' },
+    { name: 'Sửa chữa', value: topsis.repair_score, label: topsis.repair_score.toFixed(2), color: '#3b82f6' },
+    { name: 'Hủy bỏ', value: topsis.replace_score, label: topsis.replace_score.toFixed(2), color: '#f59e0b' },
+    { name: 'Chờ xử lý', value: 0.05, label: '0.05', color: '#94a3b8' },
+    { name: 'Non-ideal', value: 0, label: 'D⁻', color: '#ef4444' },
   ]
 
   // Prepare data for Entropy Bar Chart
@@ -176,7 +272,7 @@ const MCDMResultsPanel = ({ mcdmData }) => {
     <div className="rounded-xl border-2 border-slate-300 bg-white p-5 shadow-lg">
       {/* Header */}
       <div className="mb-4 border-b-2 border-slate-200 pb-3">
-        <h2 className="text-center text-lg font-black uppercase tracking-wide text-slate-800">
+        <h2 className="text-center text-base font-black uppercase tracking-wide text-slate-800">
           METHODOLOGY COMPARISON & AGGREGATION
         </h2>
       </div>
@@ -185,31 +281,33 @@ const MCDMResultsPanel = ({ mcdmData }) => {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         
         {/* LEFT: Entropy Method */}
-        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase text-blue-900">
-              PHƯƠNG PHÁP ENTROPY<br/>
-              <span className="text-xs font-normal">(KHÁCH QUAN)</span>
-            </h3>
-            <span className={`rounded-full px-2 py-1 text-xs font-bold ${
+        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-black uppercase leading-tight text-blue-900">
+                PHƯƠNG PHÁP ENTROPY
+              </h3>
+              <p className="text-[10px] text-blue-700">(KHÁCH QUAN)</p>
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
               entropy.decision === 'repair' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
             }`}>
               {entropy.decision === 'repair' ? 'SỬA' : 'BỎ'}
             </span>
           </div>
 
-          <p className="mb-3 text-xs text-slate-700">
+          <p className="mb-2 text-[10px] leading-tight text-slate-700">
             TỰ ĐỘNG XÁC ĐỊNH TRỌNG SỐ<br/>
             DỰA TRÊN DỮ LIỆU BẤT THỦ VÀ BIẾN ĐỘNG
           </p>
 
           {/* Entropy Bar Chart */}
-          <div className="mb-3 h-40">
+          <div className="mb-2 h-32">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={entropyBarData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 50]} tick={{ fontSize: 10 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
+                <XAxis type="number" domain={[0, 50]} tick={{ fontSize: 9 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={70} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                   {entropyBarData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -219,7 +317,7 @@ const MCDMResultsPanel = ({ mcdmData }) => {
             </ResponsiveContainer>
           </div>
 
-          <div className="rounded bg-white p-2 text-xs">
+          <div className="rounded bg-white p-2 text-[10px]">
             <p className="font-semibold text-slate-700">Góc nhìn Dữ liệu:</p>
             <p className="text-slate-600">
               Tiêu chí Cost biến động lớn nhất → quan trọng nhất.
@@ -228,37 +326,40 @@ const MCDMResultsPanel = ({ mcdmData }) => {
         </div>
 
         {/* RIGHT: AHP Method */}
-        <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-black uppercase text-purple-900">
-              PHƯƠNG PHÁP AHP<br/>
-              <span className="text-xs font-normal">(CHỦ QUAN)</span>
-            </h3>
-            <span className={`rounded-full px-2 py-1 text-xs font-bold ${
+        <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-black uppercase leading-tight text-purple-900">
+                PHƯƠNG PHÁP AHP
+              </h3>
+              <p className="text-[10px] text-purple-700">(CHỦ QUAN)</p>
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
               ahp.decision === 'repair' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
             }`}>
               {ahp.decision === 'repair' ? 'SỬA' : 'BỎ'}
             </span>
           </div>
 
-          <p className="mb-3 text-xs text-slate-700">
+          <p className="mb-2 text-[10px] leading-tight text-slate-700">
             DỰA TRÊN KINH NGHIỆM CHUYÊN<br/>
             GIA VÀ ĐÁNH GIÁ DỰA TIÊU CHÍ
           </p>
 
           {/* AHP Radar Chart */}
-          <div className="mb-3 flex h-40 items-center justify-center">
+          <div className="mb-2 flex h-32 items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={ahpRadarData}>
                 <PolarGrid stroke="#cbd5e1" />
-                <PolarAngleAxis dataKey="criterion" tick={{ fontSize: 10, fill: '#475569' }} />
-                <PolarRadiusAxis angle={90} domain={[0, 1]} tick={{ fontSize: 9 }} />
+                <PolarAngleAxis dataKey="criterion" tick={{ fontSize: 9, fill: '#475569' }} />
+                <PolarRadiusAxis angle={90} domain={[0, 1]} tick={{ fontSize: 8 }} />
                 <Radar name="AHP" dataKey="value" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.6} />
+                <Tooltip />
               </RadarChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="rounded bg-white p-2 text-xs">
+          <div className="rounded bg-white p-2 text-[10px]">
             <p className="font-semibold text-slate-700">Góc nhìn Chuyên gia:</p>
             <p className="text-slate-600">
               Tiêu chí Costs: Ưu tiên chất lượng và tần dụng nguyên liệu.
@@ -267,100 +368,76 @@ const MCDMResultsPanel = ({ mcdmData }) => {
         </div>
       </div>
 
-      {/* TOPSIS Section */}
-      <div className="mt-4 rounded-lg border-2 border-emerald-200 bg-emerald-50 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-black uppercase text-emerald-900">
-            XẾP HẠNG TOPSIS & ĐIỂM SỐ C*
-          </h3>
-          <span className="rounded bg-white px-2 py-1 text-xs font-bold text-slate-700">
-            C* = {topsis.repair_score.toFixed(2)}
-          </span>
-        </div>
-
-        {/* TOPSIS Bar Chart */}
-        <div className="mb-3 h-32">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={topsisBarData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-              <YAxis domain={[0, 1]} tick={{ fontSize: 10 }} />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {topsisBarData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <p className="text-xs text-slate-700">
-          <span className="font-semibold">Xếp hạng tối ưu:</span> Gần D⁺ nhất; Xa D⁻ nhất.
-        </p>
-      </div>
-
       {/* Aggregation Section */}
-      <div className="mt-4 rounded-lg border-2 border-indigo-300 bg-gradient-to-br from-indigo-100 to-white p-4">
-        <h3 className="mb-3 text-center text-sm font-black uppercase text-indigo-900">
+      <div className="mt-3 rounded-lg border-2 border-indigo-300 bg-gradient-to-br from-indigo-100 to-white p-3">
+        <h3 className="mb-2 text-center text-xs font-black uppercase text-indigo-900">
           TỔNG HỢP QUYẾT ĐỊNH & GẦN TRỌNG SỐ
         </h3>
 
-        <div className="mb-3 text-center">
-          <p className="text-xs text-slate-700">
+        <div className="mb-2 text-center">
+          <p className="text-[10px] text-slate-700">
             TỔNG ĐIỂM (C*) = {aggregated.method_weights?.ahp?.toFixed(2) || '0.40'}(AHP) + {aggregated.method_weights?.entropy?.toFixed(2) || '0.30'}(Entropy) + {aggregated.method_weights?.topsis?.toFixed(2) || '0.30'}(TOPSIS)
           </p>
-          <p className="mt-1 text-lg font-black text-indigo-900">
+          <p className="mt-1 text-sm font-black text-indigo-900">
             Gần trọng số: AHP {(aggregated.method_weights?.ahp * 100 || 40).toFixed(0)}%, Entropy {(aggregated.method_weights?.entropy * 100 || 30).toFixed(0)}%, TOPSIS {(aggregated.method_weights?.topsis * 100 || 30).toFixed(0)}%
           </p>
         </div>
 
-        <div className="rounded-lg bg-white p-3 text-center">
-          <p className="mb-1 text-xs text-slate-600">Trọng số dựa trên bối cảnh doanh nghiệp (coi trọng kinh nghiệm kĩ sư).</p>
+       
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/* TOPSIS Ranking Panel (for right column)                     */
+/* ─────────────────────────────────────────────────────────── */
+const TOPSISRankingPanel = ({ mcdmData }) => {
+  if (!mcdmData) return null
+
+  const { topsis } = mcdmData
+
+  // Prepare data for TOPSIS Bar Chart
+  const topsisBarData = [
+    { name: 'Ideal', value: 0.5, color: '#10b981', label: 'D⁺' },
+    { name: 'Sửa chữa', value: topsis.repair_score, color: '#3b82f6', label: topsis.repair_score.toFixed(2) },
+    { name: 'Hủy bỏ', value: topsis.replace_score, color: '#f59e0b', label: topsis.replace_score.toFixed(2) },
+    { name: 'Chờ xử lý', value: 0.05, color: '#94a3b8', label: '0.05' },
+    { name: 'Non-ideal', value: 0, color: '#ef4444', label: 'D⁻' },
+  ]
+
+  return (
+    <div className="rounded-xl border-2 border-emerald-300 bg-white p-4 shadow-lg">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-black uppercase text-emerald-900">
+          XẾP HẠNG TOPSIS &<br/>ĐIỂM SỐ C*
+        </h3>
+        <div className="text-center">
+          <div className="text-xs text-slate-600">C*</div>
+          <div className="text-lg font-black text-emerald-700">{topsis.repair_score.toFixed(2)}</div>
         </div>
       </div>
 
-      {/* Final Decision */}
-      <div className={`mt-4 rounded-lg border-2 p-4 ${
-        aggregated.decision === 'repair' 
-          ? 'border-emerald-400 bg-emerald-50' 
-          : 'border-rose-400 bg-rose-50'
-      }`}>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-slate-600">KẾT LUẬN CUỐI CÙNG & ĐÁNH GIÁ ĐỘ NGHIÊM TRỌNG</p>
-            <h2 className={`mt-1 text-2xl font-black ${
-              aggregated.decision === 'repair' ? 'text-emerald-700' : 'text-rose-700'
-            }`}>
-              🎯 KHUYẾN NGHỊ: NÊN {aggregated.decision === 'repair' ? 'SỬA CHỮA' : 'LOẠI BỎ'} (C* = {aggregated.repair_score.toFixed(2)})
-            </h2>
-          </div>
-          <div className="text-center">
-            <div className={`flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
-              aggregated.decision === 'repair' ? 'bg-emerald-500' : 'bg-rose-500'
-            }`}>
-              {aggregated.decision === 'repair' ? '✓' : '✗'}
-            </div>
-          </div>
-        </div>
+      {/* TOPSIS Bar Chart */}
+      <div className="mb-3 h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={topsisBarData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-15} textAnchor="end" height={60} />
+            <YAxis domain={[0, 1]} tick={{ fontSize: 9 }} />
+            <Tooltip />
+            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              {topsisBarData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
 
-        <div className="mt-3 rounded bg-white p-3 text-xs text-slate-700">
-          <p className="font-semibold">
-            Sau khi tích hợp trong số (AHP chuyên gia + Entropy dữ liệu), thuật toán TOPSIS đánh giá phương án Sửa chữa là gần điểm lý tưởng nhất. Do nghiệm kĩ thuật đã xác nhận trên vùng chịu lực chính, nhưng việc sửa chữa mang lại hiệu quả chi phí và thời gian tối ưu so với Hủy bỏ.
-          </p>
-        </div>
-
-        {/* Voting */}
-        {aggregated.votes && (
-          <div className="mt-3 flex items-center justify-center gap-4 text-sm">
-            <span className="font-semibold text-slate-700">Biểu quyết:</span>
-            <span className="text-emerald-700">✓ Sửa: {aggregated.votes.repair}/3</span>
-            <span className="text-slate-300">|</span>
-            <span className="text-rose-700">✗ Bỏ: {aggregated.votes.replace}/3</span>
-            <span className="ml-auto rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white">
-              Độ tin cậy: {(aggregated.confidence * 100).toFixed(0)}%
-            </span>
-          </div>
-        )}
+      <div className="rounded bg-emerald-50 p-2 text-[10px] text-slate-700">
+        <p className="font-semibold">Xếp hạng tối ưu:</p>
+        <p>Gần D⁺ nhất; Xa D⁻ nhất.</p>
       </div>
     </div>
   )
@@ -432,6 +509,7 @@ const FeaturesStrip = () => {
 export default function Dashboard() {
   const [images, setImages] = useState([])
   const [selectedId, setSelectedId] = useState(null)
+  const [analyzedImages, setAnalyzedImages] = useState([]) // Store analyzed images with results
 
   // API state
   const [loading, setLoading] = useState(false)
@@ -518,15 +596,17 @@ export default function Dashboard() {
         )
       )
 
-      setDefects(mappedFaults)
-      setSummary({
+      const newSummary = {
         warning_count: data.warning_count ?? 0,
         fault_count: data.fault_count ?? mappedFaults.length,
         avg_conf: data.avg_conf ?? 0,
         avg_time: mappedFaults.length ? mappedFaults.map(f => parseTime(f.time)).reduce((a, b) => a + b, 0) / mappedFaults.length : 0,
         process_time: data.process_time ?? 0,
         total_estimated_cost: data.total_estimated_cost ?? 0,
-      })
+      }
+
+      setDefects(mappedFaults)
+      setSummary(newSummary)
 
       const nextRepair = Number(data.repairScore ?? 0)
       const nextReplace = Number(data.replaceScore ?? 0)
@@ -536,6 +616,27 @@ export default function Dashboard() {
       setDecision(nextDecision)
       setLastEntryId(data.id ?? null)
       setMcdmResults(data.mcdm ?? null) // Store MCDM results
+
+      // Add to analyzed images list
+      const analyzedImage = {
+        id: selectedImage.id,
+        name: selectedImage.name,
+        image_base64: data.image_base64,
+        defects: mappedFaults,
+        summary: newSummary,
+        repairScore: nextRepair,
+        replaceScore: nextReplace,
+        decision: nextDecision,
+        mcdm: data.mcdm,
+        entryId: data.id,
+        timestamp: Date.now(),
+      }
+
+      setAnalyzedImages((prev) => {
+        // Remove if already exists, then add to front
+        const filtered = prev.filter(img => img.id !== selectedImage.id)
+        return [analyzedImage, ...filtered]
+      })
 
       // Persist for History / Stats
       persistHistory({
@@ -589,6 +690,18 @@ export default function Dashboard() {
     }
   }
 
+  /* ── Load analyzed image from sidebar ── */
+  const handleLoadAnalyzedImage = (analyzedImg) => {
+    setDefects(analyzedImg.defects)
+    setSummary(analyzedImg.summary)
+    setRepairScore(analyzedImg.repairScore)
+    setReplaceScore(analyzedImg.replaceScore)
+    setDecision(analyzedImg.decision)
+    setMcdmResults(analyzedImg.mcdm)
+    setLastEntryId(analyzedImg.entryId)
+    setSelectedId(analyzedImg.id)
+  }
+
   return (
     <div className="min-h-screen bg-[#F6F8FC] px-4 py-5 lg:px-6">
       <div className="mx-auto max-w-[1400px] space-y-4">
@@ -604,13 +717,86 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Row 1: 3 columns ─────────────────────────────── */}
+        {/* ── Row 1: 3 columns layout matching reference image ─────────────────────────────── */}
         <div className="grid grid-cols-12 gap-4">
 
-          {/* Left – image manager */}
-          <aside className="col-span-12 lg:col-span-3">
+          {/* LEFT COLUMN – Detection Image + Flaw Attributes + CR Gauge */}
+          <aside className="col-span-12 space-y-4 lg:col-span-3">
+            {/* Detection Viewer */}
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-base font-bold text-slate-800">Quản lý lô ảnh</h3>
+              <DetectionViewer image={selectedImage} defects={defects} loading={loading} />
+            </div>
+
+            {/* Flaw Attributes Panel */}
+            {defects.length > 0 && (
+              <FlawAttributesPanel defects={defects} summary={summary} />
+            )}
+          </aside>
+
+          {/* CENTER COLUMN – MCDM Methodology Comparison */}
+          <main className="col-span-12 lg:col-span-6">
+            {/* File Info Header */}
+            {selectedImage && (
+              <div className="mb-3 rounded-lg border border-slate-200 bg-white px-4 py-2 shadow-sm">
+                <p className="text-sm text-slate-600">
+                  📄 <span className="font-semibold">{selectedImage.name}</span>
+                  {summary.warning_count > 0 && (
+                    <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+                      High Priority
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+
+            {/* MCDM Results Panel */}
+            <MCDMResultsPanel mcdmData={mcdmResults} />
+
+            {/* Final Decision Card */}
+            {decision && (
+              <div className={`mt-4 rounded-xl border-2 p-5 shadow-lg ${
+                decision === 'repair' 
+                  ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 to-white' 
+                  : 'border-rose-400 bg-gradient-to-br from-rose-50 to-white'
+              }`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-600">
+                      KẾT LUẬN CUỐI CÙNG & ĐÁNH GIÁ ĐỘ NGHIÊM TRỌNG
+                    </p>
+                    <h2 className={`mt-2 text-2xl font-black ${
+                      decision === 'repair' ? 'text-emerald-700' : 'text-rose-700'
+                    }`}>
+                      🎯 KHUYẾN NGHỊ: NÊN {decision === 'repair' ? 'SỬA CHỮA' : 'LOẠI BỎ'} (C* = {repairScore.toFixed(2)})
+                    </h2>
+                    <p className="mt-3 rounded-lg bg-white p-3 text-xs leading-relaxed text-slate-700">
+                      Sau khi tích hợp trọng số (AHP chuyên gia + Entropy dữ liệu), thuật toán TOPSIS đánh giá phương án <span className="font-bold">{decision === 'repair' ? 'Sửa chữa' : 'Loại bỏ'}</span> là gần điểm lý tưởng nhất. Do nghiệm kĩ thuật đã xác nhận trên vùng chịu lực chính, nhưng việc {decision === 'repair' ? 'sửa chữa' : 'loại bỏ'} mang lại hiệu quả chi phí và thời gian tối ưu so với {decision === 'repair' ? 'Hủy bỏ' : 'Sửa chữa'}.
+                    </p>
+                  </div>
+                  <div className="ml-4 flex flex-col items-center gap-2">
+                    <div className={`flex h-20 w-20 items-center justify-center rounded-full text-4xl shadow-lg ${
+                      decision === 'repair' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                    }`}>
+                      {decision === 'repair' ? '✓' : '✗'}
+                    </div>
+                    <button className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-rose-700">
+                      <span>📄</span>
+                      <div className="text-left">
+                        <div>Tạo Báo cáo Xử</div>
+                        <div>hướng PDF</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* RIGHT COLUMN – Image Manager + Analyzed Images + Status + AHP Controls + TOPSIS Ranking */}
+          <aside className="col-span-12 space-y-3 lg:col-span-3">
+            {/* Image Manager - for uploading new images */}
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-bold text-slate-800">📤 Tải ảnh mới</h3>
               <ImageUploader
                 images={images}
                 setImages={setImages}
@@ -618,35 +804,18 @@ export default function Dashboard() {
                 setSelectedId={setSelectedId}
               />
             </div>
-          </aside>
 
-          {/* Center – detection viewer + defect table */}
-          <main className="col-span-12 lg:col-span-5">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <DetectionViewer image={selectedImage} defects={defects} loading={loading} />
-              <div className="mt-4">
-                <h4 className="mb-2 text-base font-bold text-slate-900">
-                  Chi tiết lỗi phân tích lô:{' '}
-                  <span className="text-[#1E3A8A]">
-                    #{selectedImage?.name?.replace(/\.[^.]+$/, '').slice(-6) ?? '---'}
-                  </span>
-                </h4>
-                <DefectTable faults={defects} />
-              </div>
-            </div>
+            {/* Analyzed Images Sidebar */}
+            <AnalyzedImagesSidebar
+              analyzedImages={analyzedImages}
+              onSelect={handleLoadAnalyzedImage}
+              selectedId={selectedId}
+            />
 
-            {/* Flaw Attributes Panel */}
-            {defects.length > 0 && (
-              <div className="mt-4">
-                <FlawAttributesPanel defects={defects} summary={summary} />
-              </div>
-            )}
-          </main>
-
-          {/* Right – status + AHP + result + MCDM */}
-          <aside className="col-span-12 space-y-3 lg:col-span-4">
+            {/* Status Card */}
             <StatusCard summary={summary} />
 
+            {/* AHP Panel */}
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <AHPPanel
                 costWeight={costWeight}
@@ -664,21 +833,9 @@ export default function Dashboard() {
               />
             </div>
 
-            <ResultCard repairScore={repairScore} replaceScore={replaceScore} decision={decision} />
-            
-            {/* MCDM Results Panel */}
-            <MCDMResultsPanel mcdmData={mcdmResults} />
+            {/* TOPSIS Ranking Panel */}
+            {mcdmResults && <TOPSISRankingPanel mcdmData={mcdmResults} />}
           </aside>
-        </div>
-
-        {/* ── Row 2: How It Works + Features ───────────────── */}
-        <div className="grid grid-cols-12 gap-4">
-          <div className="col-span-12 lg:col-span-7">
-            <HowItWorksStrip />
-          </div>
-          <div className="col-span-12 lg:col-span-5">
-            <FeaturesStrip />
-          </div>
         </div>
 
         {/* Footer */}
