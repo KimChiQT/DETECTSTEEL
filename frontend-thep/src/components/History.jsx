@@ -272,13 +272,41 @@ function DetailModal({ item, onClose, onDownloadPDF, downloading }) {
             </tbody>
           </table>
           <div className="rounded-xl bg-slate-50 p-4">
-            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Kết quả AHP</p>
-            <p className={`text-lg font-black ${isRepair ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {isRepair ? 'NÊN SỬA CHỮA' : 'NÊN LOẠI BỎ'}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Score Sửa: {Number(item.repairScore || 0).toFixed(3)} — Score Bỏ: {Number(item.replaceScore || 0).toFixed(3)}
-            </p>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">KẾT QUẢ MCDM</p>
+            {/* 3 methods */}
+            <div className="mb-3 grid grid-cols-3 gap-2">
+              {[
+                { label: 'AHP', decision: item.ahpDecision || item.decision, repair: item.ahpRepair ?? item.repairScore, replace: item.ahpReplace ?? item.replaceScore, color: 'blue' },
+                { label: 'TOPSIS', decision: item.topsisDecision, repair: item.topsisRepair, replace: item.topsisReplace, color: 'emerald' },
+                { label: 'Entropy', decision: item.entropyDecision, repair: item.entropyRepair, replace: item.entropyReplace, color: 'purple' },
+              ].map(({ label, decision, repair, replace, color }) => (
+                <div key={label} className="rounded-lg border border-slate-200 bg-white p-2 text-center">
+                  <p className="mb-1 text-[10px] font-bold uppercase text-slate-500">{label}</p>
+                  {decision ? (
+                    <>
+                      <p className={`text-xs font-black ${decision === 'repair' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        {decision === 'repair' ? 'SỬA CHỮA' : 'LOẠI BỎ'}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">
+                        {Number(repair || 0).toFixed(3)} / {Number(replace || 0).toFixed(3)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-slate-300">Chưa có dữ liệu</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {/* Aggregated */}
+            <div className={`rounded-lg px-3 py-2 ${item.decision === 'repair' ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+              <p className="text-[10px] font-bold uppercase text-slate-500">Tổng hợp C*</p>
+              <p className={`text-base font-black ${item.decision === 'repair' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {item.decision === 'repair' ? 'NÊN SỬA CHỮA' : 'NÊN LOẠI BỎ'}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                C* = {Number(item.repairScore || 0).toFixed(3)} — Score Bỏ: {Number(item.replaceScore || 0).toFixed(3)}
+              </p>
+            </div>
           </div>
         </div>
       </div>
