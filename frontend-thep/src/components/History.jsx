@@ -25,6 +25,8 @@ function normalizeEntry(raw, idx) {
   }))
   const majorCount = normalized.filter((d) => d.major).length
   const minorCount = Math.max(0, normalized.length - majorCount)
+  // Extract MCDM scores
+  const mcdm = raw.mcdm || null
   return {
     ...raw,
     lotCode: String(idx + 1).padStart(3, '0'),
@@ -33,13 +35,22 @@ function normalizeEntry(raw, idx) {
     majorCount,
     minorCount,
     topDefect: normalized[0]?.label || '-',
-    // imageData: API uses image_base64, localStorage uses imageData
     imageData: raw.imageData || raw.image_base64 || null,
     imageId: raw.imageId || raw.filename || null,
     ts: raw.ts || (raw.timestamp ? new Date(raw.timestamp).getTime() : Date.now()),
     repairScore: Number(raw.repairScore || 0),
     replaceScore: Number(raw.replaceScore || 0),
     decision: raw.decision || 'repair',
+    // MCDM per-method scores
+    ahpRepair:     Number(mcdm?.ahp?.repair_score     ?? raw.repairScore ?? 0),
+    ahpReplace:    Number(mcdm?.ahp?.replace_score    ?? raw.replaceScore ?? 0),
+    topsisRepair:  Number(mcdm?.topsis?.repair_score  ?? 0),
+    topsisReplace: Number(mcdm?.topsis?.replace_score ?? 0),
+    entropyRepair: Number(mcdm?.entropy?.repair_score ?? 0),
+    entropyReplace:Number(mcdm?.entropy?.replace_score?? 0),
+    ahpDecision:     mcdm?.ahp?.decision     ?? raw.decision ?? 'repair',
+    topsisDecision:  mcdm?.topsis?.decision  ?? null,
+    entropyDecision: mcdm?.entropy?.decision ?? null,
   }
 }
 
@@ -142,19 +153,70 @@ async function downloadPDF(it) {
   pdf.line(margin, y, W - margin, y)
   y += 14
 
-  // AHP result box
+  // ── MCDM result box (3 methods + aggregated) ──────────────
   const isRepair = it.decision === 'repair'
+  const boxH = it.ahpDecision ? 110 : 56
   pdf.setFillColor(248, 250, 252)
-  pdf.roundedRect(margin, y, W - margin * 2, 56, 4, 4, 'F')
+  pdf.roundedRect(margin, y, W - margin * 2, boxH, 4, 4, 'F')
   pdf.setDrawColor(226, 232, 240)
-  pdf.roundedRect(margin, y, W - margin * 2, 56, 4, 4, 'S')
+  pdf.roundedRect(margin, y, W - margin * 2, boxH, 4, 4, 'S')
+
+  // Title
   pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(100, 116, 139)
-  pdfText(pdf, 'KẾT QUẢ AHP', margin + 10, y + 14)
-  pdf.setFontSize(13); pdf.setTextColor(...(isRepair ? [5, 150, 105] : [220, 38, 38]))
-  pdfText(pdf, isRepair ? 'NÊN SỬA CHỮA' : 'NÊN LOẠI BỎ', margin + 10, y + 32)
+  pdfText(pdf, 'KẾT QUẢ MCDM (AHP + TOPSIS + Entropy)', margin + 10, y + 14)
+
+  // 3-method row headers
+  pdf.setFontSize(7.5); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(71, 85, 105)
+  pdfText(pdf, 'AHP (Chuyen gia)', margin + 10, y + 30)
+  pdfText(pdf, 'TOPSIS (So sanh)', margin + 175, y + 30)
+  pdfText(pdf, 'Entropy (Du lieu)', margin + 340, y + 30)
+
+  // 3-method values
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'bold')
+  const ahpD = it.ahpDecision || it.decision
+  const topD = it.topsisDecision || null
+  const entD = it.entropyDecision || null
+  pdf.setTextColor(...(ahpD === 'repair' ? [5, 150, 105] : [220, 38, 38]))
+  pdfText(pdf, ahpD === 'repair' ? 'SUA CHUA' : 'LOAI BO', margin + 10, y + 44)
+  pdf.setFontSize(7.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139)
+  pdfText(pdf, `Sua: ${Number(it.ahpRepair || it.repairScore || 0).toFixed(3)}  Bo: ${Number(it.ahpReplace || it.replaceScore || 0).toFixed(3)}`, margin + 10, y + 55)
+
+  if (topD) {
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(...(topD === 'repair' ? [5, 150, 105] : [220, 38, 38]))
+    pdfText(pdf, topD === 'repair' ? 'SUA CHUA' : 'LOAI BO', margin + 175, y + 44)
+    pdf.setFontSize(7.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139)
+    pdfText(pdf, `Sua: ${Number(it.topsisRepair || 0).toFixed(3)}  Bo: ${Number(it.topsisReplace || 0).toFixed(3)}`, margin + 175, y + 55)
+  } else {
+    pdf.setFontSize(8); pdf.setTextColor(148, 163, 184)
+    pdfText(pdf, 'Chua co du lieu', margin + 175, y + 44)
+  }
+
+  if (entD) {
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(...(entD === 'repair' ? [5, 150, 105] : [220, 38, 38]))
+    pdfText(pdf, entD === 'repair' ? 'SUA CHUA' : 'LOAI BO', margin + 340, y + 44)
+    pdf.setFontSize(7.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139)
+    pdfText(pdf, `Sua: ${Number(it.entropyRepair || 0).toFixed(3)}  Bo: ${Number(it.entropyReplace || 0).toFixed(3)}`, margin + 340, y + 55)
+  } else {
+    pdf.setFontSize(8); pdf.setTextColor(148, 163, 184)
+    pdfText(pdf, 'Chua co du lieu', margin + 340, y + 44)
+  }
+
+  // Divider
+  pdf.setDrawColor(226, 232, 240); pdf.setLineWidth(0.4)
+  pdf.line(margin + 6, y + 62, margin + W - margin * 2 - 6, y + 62)
+
+  // Aggregated result
+  pdf.setFontSize(8); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(100, 116, 139)
+  pdfText(pdf, 'TONG HOP (C*) =', margin + 10, y + 76)
+  pdf.setFontSize(11); pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor(...(isRepair ? [5, 150, 105] : [220, 38, 38]))
+  pdfText(pdf, isRepair ? 'NEN SUA CHUA' : 'NEN LOAI BO', margin + 110, y + 76)
   pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 116, 139)
-  pdfText(pdf, `Score Sửa: ${Number(it.repairScore || 0).toFixed(3)}   Score Bỏ: ${Number(it.replaceScore || 0).toFixed(3)}`, margin + 10, y + 46)
-  y += 68
+  pdfText(pdf, `C* = ${Number(it.repairScore || 0).toFixed(3)}  |  Score Bo: ${Number(it.replaceScore || 0).toFixed(3)}`, margin + 10, y + 90)
+
+  y += boxH + 14
 
   // Footer
   pdf.setFontSize(8); pdf.setTextColor(148, 163, 184)
@@ -527,16 +589,17 @@ export default function History() {
                   <th className="px-4 py-2.5 text-center">Tổng lỗi</th>
                   <th className="px-4 py-2.5 text-center">Lỗi lớn/nhỏ</th>
                   <th className="px-4 py-2.5 text-left">Loại lỗi chính</th>
-                  <th className="px-4 py-2.5 text-left">AHP Quyết định</th>
-                  <th className="px-4 py-2.5 text-center">Score Sửa</th>
-                  <th className="px-4 py-2.5 text-center">Score Bỏ</th>
+                  <th className="px-4 py-2.5 text-center">AHP</th>
+                  <th className="px-4 py-2.5 text-center">TOPSIS</th>
+                  <th className="px-4 py-2.5 text-center">Entropy</th>
+                  <th className="px-4 py-2.5 text-center">Tổng hợp C*</th>
                   <th className="px-4 py-2.5 text-center">Tác vụ</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={9} className="py-10 text-center text-sm text-slate-400">
+                    <td colSpan={10} className="py-10 text-center text-sm text-slate-400">
                       <div className="flex items-center justify-center gap-2">
                         <svg className="h-4 w-4 animate-spin text-[#1E3A8A]" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
                         Đang tải dữ liệu...
@@ -546,7 +609,7 @@ export default function History() {
                 )}
                 {!loading && parsed.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="py-16 text-center text-sm text-slate-400">
+                    <td colSpan={10} className="py-16 text-center text-sm text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <svg className="h-10 w-10 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                           <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
@@ -581,16 +644,42 @@ export default function History() {
                       <td className="px-4 py-2.5 text-center font-semibold text-slate-800">{it.totalFault}</td>
                       <td className="px-4 py-2.5 text-center text-slate-600">{it.majorCount} / {it.minorCount}</td>
                       <td className="px-4 py-2.5 text-slate-700">{it.topDefect}</td>
-                      <td className="px-4 py-2.5">
-                        <p className={`text-xs font-black ${isRepair ? 'text-[#1E3A8A]' : 'text-rose-600'}`}>
-                          {isRepair ? 'NÊN SỬA CHỮA' : 'NÊN LOẠI BỎ'}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          {it.repairScore.toFixed(3)} vs {it.replaceScore.toFixed(3)}
-                        </p>
+                      {/* AHP */}
+                      <td className="px-4 py-2.5 text-center">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${it.ahpDecision === 'repair' ? 'bg-blue-100 text-blue-700' : 'bg-rose-100 text-rose-700'}`}>
+                          {it.ahpDecision === 'repair' ? 'SỬA' : 'BỎ'}
+                        </span>
+                        <p className="mt-0.5 text-[10px] text-slate-400">{it.ahpRepair.toFixed(2)}</p>
                       </td>
-                      <td className="px-4 py-2.5 text-center font-bold text-slate-800">{it.repairScore.toFixed(3)}</td>
-                      <td className="px-4 py-2.5 text-center font-bold text-slate-800">{it.replaceScore.toFixed(3)}</td>
+                      {/* TOPSIS */}
+                      <td className="px-4 py-2.5 text-center">
+                        {it.topsisDecision ? (
+                          <>
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${it.topsisDecision === 'repair' ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
+                              {it.topsisDecision === 'repair' ? 'SỬA' : 'BỎ'}
+                            </span>
+                            <p className="mt-0.5 text-[10px] text-slate-400">{it.topsisRepair.toFixed(2)}</p>
+                          </>
+                        ) : <span className="text-[10px] text-slate-300">—</span>}
+                      </td>
+                      {/* Entropy */}
+                      <td className="px-4 py-2.5 text-center">
+                        {it.entropyDecision ? (
+                          <>
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${it.entropyDecision === 'repair' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {it.entropyDecision === 'repair' ? 'SỬA' : 'BỎ'}
+                            </span>
+                            <p className="mt-0.5 text-[10px] text-slate-400">{it.entropyRepair.toFixed(2)}</p>
+                          </>
+                        ) : <span className="text-[10px] text-slate-300">—</span>}
+                      </td>
+                      {/* Aggregated C* */}
+                      <td className="px-4 py-2.5 text-center">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-black ${it.decision === 'repair' ? 'bg-[#1E3A8A] text-white' : 'bg-rose-600 text-white'}`}>
+                          {it.decision === 'repair' ? 'SỬA' : 'BỎ'}
+                        </span>
+                        <p className="mt-0.5 text-[10px] font-bold text-slate-600">C*={it.repairScore.toFixed(2)}</p>
+                      </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-center gap-1.5">
                           {/* Xem chi tiết */}

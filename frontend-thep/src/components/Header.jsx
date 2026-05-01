@@ -37,6 +37,15 @@ function IconLayers({ className = 'h-4 w-4' }) {
   )
 }
 
+function IconAnalysis({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="11" cy="11" r="8" />
+      <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 const navBtn =
   'flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-900 hover:shadow-sm md:gap-2 md:px-3.5 md:py-2 md:text-sm'
 
@@ -102,6 +111,16 @@ export default function Header({ page, setPage, isLoggedIn, onLogout, onStart })
             >
               <IconLayers className="h-4 w-4 text-violet-600" />
               Phân tích Lô
+              {!isLoggedIn && <span className="ml-0.5 text-[9px]">🔒</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => goProtected('dashboard')}
+              className={`${navBtn} ${page === 'dashboard' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}
+              title={!isLoggedIn ? 'Đăng nhập để sử dụng' : ''}
+            >
+              <IconAnalysis className="h-4 w-4 text-rose-600" />
+              Phân tích Đánh giá
               {!isLoggedIn && <span className="ml-0.5 text-[9px]">🔒</span>}
             </button>
             <button
@@ -188,6 +207,9 @@ export default function Header({ page, setPage, isLoggedIn, onLogout, onStart })
           </button>
           <button type="button" onClick={() => goProtected('batch')} className={`${navBtn} text-xs ${page === 'batch' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}>
             <IconLayers className="h-3.5 w-3.5" /> Phân tích Lô {!isLoggedIn && '🔒'}
+          </button>
+          <button type="button" onClick={() => goProtected('dashboard')} className={`${navBtn} text-xs ${page === 'dashboard' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}>
+            <IconAnalysis className="h-3.5 w-3.5" /> Đánh giá {!isLoggedIn && '🔒'}
           </button>
           <button type="button" onClick={() => goProtected('stats')} className={`${navBtn} text-xs ${page === 'stats' ? navBtnActive : ''} ${!isLoggedIn ? 'opacity-50' : ''}`}>
             <IconChart className="h-3.5 w-3.5" /> Thống kê {!isLoggedIn && '🔒'}

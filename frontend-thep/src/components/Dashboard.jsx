@@ -46,25 +46,9 @@ const CRGauge = ({ cr = 0.04 }) => {
 /* ─────────────────────────────────────────────────────────── */
 /* Left column: image + flaw attributes + CR                   */
 /* ─────────────────────────────────────────────────────────── */
-const LeftPanel = ({ selectedImage, defects, loading, summary }) => {
-  // Compute flaw attributes
-  const attrs = useMemo(() => {
-    if (!defects.length) return { time: 0, flawArea: 0, defectShape: 0, quality: 0, cr: 0.04 }
-    const avgTime = defects.reduce((s, d) => s + parseTime(d.time), 0) / defects.length
-    const time = Math.min(avgTime / 60, 2)
-    const flawArea = defects.reduce((s, d) => s + ((d.w * d.h) / 10000), 0) / defects.length
-    const aspects = defects.map(d => d.w / (d.h || 1))
-    const avgA = aspects.reduce((a, b) => a + b, 0) / aspects.length
-    const variance = aspects.reduce((s, r) => s + Math.pow(r - avgA, 2), 0) / aspects.length
-    const defectShape = Math.min(variance / 2, 1)
-    const majorCount = defects.filter(d => d.major).length
-    const quality = 1 - (majorCount / defects.length)
-    const vals = [time, flawArea, defectShape, quality]
-    const mean = vals.reduce((a, b) => a + b, 0) / vals.length
-    const std = Math.sqrt(vals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / vals.length)
-    const cr = Math.min(std / 2, 0.1)
-    return { time: time.toFixed(2), flawArea: flawArea.toFixed(2), defectShape: defectShape.toFixed(2), quality: quality.toFixed(2), cr }
-  }, [defects])
+const LeftPanel = ({ selectedImage, defects, loading, summary, flawAttributes }) => {
+  // Use API-provided flaw_attributes, fallback to zeros if not yet analyzed
+  const attrs = flawAttributes || { time: 0, flawArea: 0, defectShape: 0, quality: 0, cr: 0 }
 
   return (
     <aside className="col-span-12 space-y-3 lg:col-span-3">
@@ -87,10 +71,10 @@ const LeftPanel = ({ selectedImage, defects, loading, summary }) => {
           </thead>
           <tbody>
             {[
-              { label: 'Time', value: attrs.time },
-              { label: 'Flaw Area', value: attrs.flawArea },
-              { label: 'Defect Shape', value: attrs.defectShape },
-              { label: 'Quality', value: attrs.quality },
+              { label: 'Time', value: Number(attrs.time).toFixed(3) },
+              { label: 'Flaw Area', value: Number(attrs.flawArea).toFixed(3) },
+              { label: 'Defect Shape', value: Number(attrs.defectShape).toFixed(3) },
+              { label: 'Quality', value: Number(attrs.quality).toFixed(3) },
             ].map((r) => (
               <tr key={r.label} className="border-b border-slate-100 last:border-0">
                 <td className="py-1.5 font-medium text-slate-700">{r.label}</td>
@@ -408,6 +392,7 @@ export default function Dashboard() {
   const [replaceScore, setReplaceScore] = useState(0)
   const [decision, setDecision] = useState(null)
   const [mcdmResults, setMcdmResults] = useState(null)
+  const [flawAttributes, setFlawAttributes] = useState(null)
 
   const selectedImage = useMemo(() => images.find((img) => img.id === selectedId), [images, selectedId])
 
@@ -465,6 +450,7 @@ export default function Dashboard() {
       setDecision(nextDecision)
       setLastEntryId(data.id ?? null)
       setMcdmResults(data.mcdm ?? null)
+      setFlawAttributes(data.flaw_attributes ?? null)
       persistHistory({
         id: `${data.id ?? Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         ts: Date.now(), imageId: selectedImage.name, imageData: data.image_base64,
@@ -530,7 +516,7 @@ export default function Dashboard() {
 
         {/* 3-column grid */}
         <div className="grid grid-cols-12 gap-4">
-          <LeftPanel selectedImage={selectedImage} defects={defects} loading={loading} summary={summary} />
+          <LeftPanel selectedImage={selectedImage} defects={defects} loading={loading} summary={summary} flawAttributes={flawAttributes} />
           <CenterPanel
             selectedImage={selectedImage} summary={summary}
             mcdmResults={mcdmResults} decision={decision}

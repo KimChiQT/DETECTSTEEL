@@ -126,7 +126,51 @@ def draw_boxes_unicode(img_bgr: np.ndarray, boxes_data: list) -> np.ndarray:
     result = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
     return result
 
-@app.post("/analyze-batch")
+def compute_flaw_attributes(detected_faults: list, fc: int, major_count: int, avg_conf: float) -> dict:
+    """Tính flaw attributes từ dữ liệu YOLO để trả về frontend."""
+    import math
+
+    if not detected_faults:
+        return {"time": 0.0, "flawArea": 0.0, "defectShape": 0.0, "quality": 1.0, "cr": 0.0}
+
+    # Time: trung bình thời gian xử lý (chuẩn hóa 0-2)
+    def parse_time(s):
+        import re
+        m = re.search(r'~(\d+)-(\d+)', str(s or ''))
+        return (int(m.group(1)) + int(m.group(2))) / 2 if m else 0
+    avg_time = sum(parse_time(f.get("time", "")) for f in detected_faults) / len(detected_faults)
+    time_norm = round(min(avg_time / 60.0, 2.0), 3)
+
+    # Flaw Area: trung bình diện tích bbox (% so với ảnh)
+    flaw_area = round(
+        sum((f["bbox"]["w"] * f["bbox"]["h"]) / 10000.0 for f in detected_faults) / len(detected_faults), 3
+    )
+
+    # Defect Shape: độ biến thiên tỷ lệ khung hình
+    aspects = [(f["bbox"]["w"] / max(f["bbox"]["h"], 0.01)) for f in detected_faults]
+    avg_a = sum(aspects) / len(aspects)
+    variance = sum((r - avg_a) ** 2 for r in aspects) / len(aspects)
+    defect_shape = round(min(variance / 2.0, 1.0), 3)
+
+    # Quality: 1 - tỷ lệ lỗi nghiêm trọng
+    quality = round(1.0 - (major_count / fc if fc > 0 else 0.0), 3)
+
+    # CR: Consistency Ratio (heuristic từ độ lệch chuẩn các giá trị)
+    vals = [time_norm, flaw_area, defect_shape, quality]
+    mean = sum(vals) / len(vals)
+    std = math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
+    cr = round(min(std / 2.0, 0.1), 3)
+
+    return {
+        "time": time_norm,
+        "flawArea": flaw_area,
+        "defectShape": defect_shape,
+        "quality": quality,
+        "cr": cr,
+    }
+
+
+
 async def analyze_batch(files: list[UploadFile] = File(...)):
     """
     Analyze multiple images in one request.
@@ -264,7 +308,8 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
             "repairScore": repair_score,
             "replaceScore": replace_score,
             "decision": decision,
-            "mcdm": mcdm_results  # Add MCDM results
+            "mcdm": mcdm_results,  # Add MCDM results
+            "flaw_attributes": compute_flaw_attributes(detected_faults, fc, major_count, avg_conf),
         }
         HISTORIES.insert(0, entry)
         results_list.append(entry)
@@ -420,7 +465,8 @@ async def analyze_image(file: UploadFile = File(...)):
         "repairScore": repair_score,
         "replaceScore": replace_score,
         "decision": decision,
-        "mcdm": mcdm_results  # Add full MCDM results
+        "mcdm": mcdm_results,  # Add full MCDM results
+        "flaw_attributes": compute_flaw_attributes(detected_faults, fc, major_count, avg_conf),
     }
     HISTORIES.insert(0, entry)
 
@@ -437,7 +483,8 @@ async def analyze_image(file: UploadFile = File(...)):
         "repairScore": entry["repairScore"],
         "replaceScore": entry["replaceScore"],
         "decision": entry["decision"],
-        "mcdm": mcdm_results  # Return MCDM results to frontend
+        "mcdm": mcdm_results,
+        "flaw_attributes": entry["flaw_attributes"],
     }
     return resp
 
