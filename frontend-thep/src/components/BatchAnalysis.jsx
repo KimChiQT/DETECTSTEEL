@@ -281,6 +281,7 @@ export default function BatchAnalysis({ onGoAHP }) {
       pending.forEach((img) => fd.append('files', img.file))
 
       const res = await fetch(`${API_BASE}/analyze-batch`, { method: 'POST', body: fd })
+        .catch(() => { throw new Error('Không thể kết nối đến server. Kiểm tra backend đang chạy tại http://127.0.0.1:8000') })
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || data.error || 'Lỗi phân tích lô')
 

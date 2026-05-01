@@ -30,7 +30,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model = YOLO('best.pt')
+# Load YOLO model — graceful fallback if weights file is missing
+_MODEL_PATH = 'best.pt'
+try:
+    model = YOLO(_MODEL_PATH)
+except FileNotFoundError:
+    model = None
+    print(f"[WARNING] Model file '{_MODEL_PATH}' not found. "
+          "Place best.pt in the project root to enable image analysis.")
 
 # In-memory history store (simple dev storage)
 HISTORIES = []
@@ -125,6 +132,11 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
     Analyze multiple images in one request.
     Returns a list of per-image results plus a batch summary.
     """
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model file 'best.pt' not found. Please place the YOLO weights file in the project root."
+        )
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -271,6 +283,11 @@ async def analyze_batch(files: list[UploadFile] = File(...)):
 
 @app.post("/analyze")
 async def analyze_image(file: UploadFile = File(...)):
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model file 'best.pt' not found. Please place the YOLO weights file in the project root."
+        )
     start_time = time.time()
     
     # Đọc ảnh từ React gửi lên
